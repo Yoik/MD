@@ -34,24 +34,40 @@ class EfficiencyPredictor(nn.Module):
         )
 
     def forward(self, x):
-        # x: [Frames, Features] (Batch size = 1)
-        x = x.squeeze(0) 
-        
-        # 1. 提取高维特征
-        feats = self.feature_net(x) # [Frames, 64]
-        
-        # 2. 计算单帧效能分 (Microscopic Efficacy)
-        scores = self.score_head(feats) # [Frames, 1]
-        
-        # 3. 计算注意力权重 (Attention Weights)
-        attn_logits = self.attention_net(feats) # [Frames, 1]
-        
-        # 使用 Softmax 归一化权重，使所有帧的权重之和为 1
-        # 这样就变成了“加权平均”，而不是简单平均
-        attn_weights = F.softmax(attn_logits, dim=0) 
-        
-        # 4. 聚合 (Weighted Sum)
-        # 宏观效能 = Σ (单帧效能 * 该帧权重)
-        macro_pred = torch.sum(scores * attn_weights)
-        
-        return macro_pred, scores, attn_weights
+            # x 可能的形状: 
+            # [Frames, Features] (旧的单条数据)
+            # [Batch, Frames, Features] (训练时 Batch=1，Captum解释时 Batch=50)
+            
+            # 1. 维度统一化处理
+            if x.dim() == 2:
+                x = x.unsqueeze(0) # 变成 [1, Frames, Features]
+                
+            batch_size, num_frames, num_feats = x.size()
+            
+            # 2. 展平 (Flatten) --- 这是修复报错的关键！
+            # 将 [Batch, Frames, Feats] 压扁成 [Batch*Frames, Feats]
+            # 这样 BatchNorm1d 就会把所有帧都视为独立的样本进行归一化，而不会混淆维度
+            x_flat = x.reshape(-1, num_feats)
+            
+            # 3. 提取特征
+            feats_flat = self.feature_net(x_flat) # 输出 [Batch*Frames, 64]
+            
+            # 4. 还原形状
+            # 变回 [Batch, Frames, 64] 以便计算注意力
+            feats = feats_flat.view(batch_size, num_frames, -1)
+            
+            # 5. 计算分数和注意力
+            scores = self.score_head(feats) # [Batch, Frames, 1]
+            attn_logits = self.attention_net(feats) # [Batch, Frames, 1]
+            
+            # 6. 注意力归一化
+            # 在 Frames 维度 (dim=1) 做 Softmax，确保每条轨迹的权重和为 1
+            attn_weights = F.softmax(attn_logits, dim=1)
+            
+            # 7. 聚合 (Weighted Sum)
+            # [Batch, Frames, 1] * [Batch, Frames, 1] -> sum -> [Batch, 1]
+            macro_pred = torch.sum(scores * attn_weights, dim=1)
+            
+            # 8. 返回结果
+            # macro_pred.squeeze(-1) 变成 [Batch]
+            return macro_pred.squeeze(-1), scores, attn_weights

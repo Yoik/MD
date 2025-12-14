@@ -81,14 +81,20 @@ def prepare_data(label_file, result_dir, pocket_atom_num, save_scaler_path=None)
     indices = np.arange(len(X_all))
     train_idx, test_idx = train_test_split(indices, test_size=0.2, random_state=42)
     
-    # 5. 特征工程 (倒数 + 标准化)
-    M = pocket_atom_num
+# 5. 特征工程 (倒数 + 标准化)
+    # 定义需要取倒数的列索引：
+    # 0-11: OBP 残基距离
+    # 19:   Dist_N_to_D332
+    # 20:   Dist_N_to_W648
+    # 注意：中间的 12-18 (角度、电子特征) 不需要取倒数
+    dist_indices = list(range(12)) 
     
     # 仅用训练集计算均值方差
     train_features_concat = np.concatenate([X_all[i] for i in train_idx], axis=0)
     
-    # 距离倒数处理 (前 M 列)
-    train_features_concat[:, :M] = 1.0 / (train_features_concat[:, :M] + 1e-6)
+    # 【关键修改】对指定列取倒数
+    # 使用 np.ix_ 来选择特定的列进行操作
+    train_features_concat[:, dist_indices] = 1.0 / (train_features_concat[:, dist_indices] + 1e-6)
     
     scaler = StandardScaler()
     scaler.fit(train_features_concat)
@@ -101,7 +107,8 @@ def prepare_data(label_file, result_dir, pocket_atom_num, save_scaler_path=None)
     X_processed = []
     for x in X_all:
         x_new = x.copy()
-        x_new[:, :M] = 1.0 / (x_new[:, :M] + 1e-6)
+        # 对同样的列取倒数
+        x_new[:, dist_indices] = 1.0 / (x_new[:, dist_indices] + 1e-6)
         x_new = scaler.transform(x_new)
         X_processed.append(x_new)
 

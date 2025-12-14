@@ -17,7 +17,7 @@ SCALER_SAVE_PATH = "saved_models/scaler.pkl"
 
 # 物理参数配置
 POCKET_ATOM_NUM = 12  # 您定义的口袋几何距离特征数量 (根据实际npy列数调整)
-INPUT_DIM = 19        # 总特征维度 (距离 + 角度 + 电子统计量)
+INPUT_DIM = 21        # 总特征维度 (距离 + 角度 + 电子统计量)
 
 # 训练超参数
 LEARNING_RATE = 0.001

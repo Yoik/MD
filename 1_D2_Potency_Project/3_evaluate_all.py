@@ -4,11 +4,12 @@ import glob
 import torch
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')  # <--- 【关键修改1】防止在服务器上画图崩溃
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
 from src.model import EfficiencyPredictor
-
 # --- 配置参数 ---
 LABEL_FILE = "data/labels.csv"
 RESULT_DIR = "data/features"
@@ -17,7 +18,7 @@ SCALER_PATH = "saved_models/scaler.pkl"
 
 # 物理参数 (必须与训练时一致)
 POCKET_ATOM_NUM = 12
-INPUT_DIM = 19
+INPUT_DIM = 21
 
 def load_and_predict_compound(compound_name, model, scaler, device):
     """
@@ -48,12 +49,19 @@ def load_and_predict_compound(compound_name, model, scaler, device):
             
             # 预处理 (倒数 + 标准化)
             data_proc = raw_data.copy()
-            data_proc[:, :POCKET_ATOM_NUM] = 1.0 / (data_proc[:, :POCKET_ATOM_NUM] + 1e-6)
+            
+            # 【关键修改】定义需要取倒数的列 (与 dataset.py 保持一致)
+            dist_indices = list(range(12)) 
+            
+            # 对这些距离特征取倒数 (转化为亲和力强度)
+            data_proc[:, dist_indices] = 1.0 / (data_proc[:, dist_indices] + 1e-6)
+            
+            # 标准化
             data_proc = scaler.transform(data_proc)
             
             # 转 Tensor
             input_tensor = torch.from_numpy(data_proc).float().unsqueeze(0).to(device)
-            
+                        
             # 推理
             with torch.no_grad():
                 macro_pred, _, _ = model(input_tensor)

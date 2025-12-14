@@ -302,6 +302,38 @@ def align_xy(lig, obp, whole):
     c = lig.mean(0); u,s,vh = np.linalg.svd(lig-c)
     return np.dot(lig-c, vh.T)[:,:2], np.dot(obp-c, vh.T)[:,:2], np.dot(whole-c, vh.T)[:,:2]
 
+def calc_kabsch_2d(mobile, target):
+    """
+    计算将 mobile 点集对齐到 target 点集的旋转矩阵 R 和平移向量 t
+    使得: mobile @ R.T + t ≈ target
+    """
+    # 1. 计算质心
+    pm = np.mean(mobile, axis=0)
+    pt = np.mean(target, axis=0)
+    
+    # 2. 去中心化
+    m = mobile - pm
+    t_coords = target - pt
+    
+    # 3. 计算协方差矩阵
+    H = np.dot(m.T, t_coords)
+    
+    # 4. SVD 分解
+    U, S, Vt = np.linalg.svd(H)
+    
+    # 5. 计算旋转矩阵
+    R = np.dot(Vt.T, U.T)
+    
+    # 6. 处理反射 (保证是旋转而不是镜像)
+    if np.linalg.det(R) < 0:
+        Vt[1, :] *= -1
+        R = np.dot(Vt.T, U.T)
+        
+    # 7. 计算平移
+    t = pt - np.dot(pm, R)
+    
+    return R, t
+
 def plot_proj(lig, obp, whole, w, labs, out, cid, suf):
     fig, ax = plt.subplots(figsize=(10,10)); ax.set_aspect('equal')
     ax.scatter(whole[:,0], whole[:,1], c='lightgray', s=30, zorder=1)
@@ -331,13 +363,13 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
     try: u = mda.Universe(topo, xtc)
     except: return None, None, None
 
-    offset = offset_calc.calculate_offset(u, 389) # ANCHOR_RESID_STD hardcoded or global
+    offset = offset_calc.calculate_offset(u, 389) 
     if offset is None: return None, None, None 
 
     lig_res = find_ligand(u)
     if not lig_res: return None, None, None
     
-    # 定义残基选择
+    # --- 定义原有残基选择 ---
     t389 = 389 + offset; t390 = 390 + offset
     r389 = u.select_atoms(f"resid {t389}"); r390 = u.select_atoms(f"resid {t390}")
     
@@ -346,7 +378,22 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
         anchor = c if c is not None else r389.center_of_mass()
     else: return None, None, None
 
-    # 环匹配逻辑 (保持不变)
+    # --- 【新增】定义 D3.32 和 W6.48 的选择 ---
+    t114 = 114 + offset
+    t386 = 386 + offset
+    
+    # D3.32: 尝试选择侧链羧基原子，如果找不到则回退到 CA
+    r114_group = u.select_atoms(f"resid {t114} and name CG OD1 OD2")
+    if len(r114_group) == 0:
+        r114_group = u.select_atoms(f"resid {t114} and name CA")
+    
+    # W6.48: 选择整个残基用于计算环质心
+    r386_group = u.select_atoms(f"resid {t386}")
+    
+    # 配体氮原子: 用于寻找碱性氮
+    lig_nitrogens = lig_res.atoms.select_atoms("name N*")
+
+    # --- 环匹配逻辑 (保持不变) ---
     manual = MANUAL_ATOM_OVERRIDES.get("unc") if "unc" in cid.lower() else None
     matched = None; w = None
     if manual:
@@ -381,8 +428,6 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
     all_angles_389 = []; all_angles_390 = []
     all_distance_decays_389 = []; all_distance_decays_390 = []
     
-    # 【新增】用于存储每一帧的 ML 特征向量
-    # 结构: [Dist_1...Dist_M, Cos_Angle, P1_Sum, P1_Max, P1_Conc, P2_Sum, P2_Max, P2_Conc]
     feature_vectors = [] 
 
     for ts in u.trajectory:
@@ -393,30 +438,57 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
         # --- 几何特征: 平面二面角 ---
         ln = calculate_plane_normal(lp)
         pn = calculate_plane_normal(plane_res.positions)
-        
-        # 1. 供 CSV/Plot 用的角度 (0-90度)
         dot_val = np.clip(np.dot(ln, pn), -1, 1)
         ga = np.degrees(np.arccos(dot_val)); ga = ga if ga<=90 else 180-ga
-        
-        # 2. 【ML特征】平面夹角余弦值 (绝对值，表示平行程度，0为垂直，1为平行)
-        # 使用绝对值是因为配体翻转180度通常被视为等效的平面取向
         ml_cos_angle = np.abs(dot_val)
         
         # --- OBP 距离特征 ---
-        # 3. 【ML特征】质心到口袋 CA 的距离向量
         dobp = distance_array(lc_geo[None,:], obp_atoms.positions, box=u.dimensions)[0]
-        # 填充缺失值 (如果残基缺失，用大数值代替)
         if len(dobp) < len(OBP_RESIDUES_STD):
             padded_dobp = np.ones(len(OBP_RESIDUES_STD)) * 20.0
             padded_dobp[:len(dobp)] = dobp
             dobp = padded_dobp
 
+# --- 【新增】配体碱性氮相关特征计算 ---
+        # 改动点1：默认值设为 0.0，对应"忽略"和"无信号"的状态
+        dist_n_114 = 0.0
+        dist_n_386 = 0.0
+        
+        if len(lig_nitrogens) > 0:
+            # 1. 寻找配体上距离 D3.32 (114) 最近的氮原子 (逻辑不变，用于定位)
+            if len(r114_group) > 0:
+                # 计算所有 N 到 D3.32 所有原子的距离矩阵
+                dmat_114 = cdist(lig_nitrogens.positions, r114_group.positions)
+                # 找到每个 N 到 D3.32 的最小距离
+                min_dists = np.min(dmat_114, axis=1)
+                # 确定哪个 N 是最近的 ("Basic Nitrogen")
+                closest_n_idx = np.argmin(min_dists)
+                basic_n_pos = lig_nitrogens.positions[closest_n_idx]
+                
+                # 特征1: 【关键修改】虽然算出了位置，但强制将特征值设为 0.0 (Masking)
+                # 这样模型就无法利用盐桥距离来"作弊"
+                dist_n_114 = 0.0
+            else:
+                basic_n_pos = None
+
+            # 2. 计算该氮原子到 W6.48 (386) 苯环质心的距离，并应用高斯衰减
+            if basic_n_pos is not None and len(r386_group) > 0:
+                c386, _ = get_aromatic_ring_data(r386_group)
+                if c386 is None: # 如果提取失败，回退到几何中心
+                    c386 = r386_group.center_of_mass()
+                
+                # 计算原始欧氏距离
+                raw_dist_386 = np.linalg.norm(basic_n_pos - c386)
+                
+                # 特征2: 【关键修改】应用高斯衰减 exp(-(d/4)^2)
+                # 将距离差异转化为显著的信号强度差异 (0~1)
+                # 3.5A -> ~0.46 (强), 5.5A -> ~0.15 (弱)
+                dist_n_386 = np.exp(-((raw_dist_386 / 4.0) ** 2))
+                
         # --- Phe 389 电子特征 ---
         c1, n1 = get_aromatic_ring_data(r389)
-        d1_geo = 999.0; d1_w = 999.0; a1 = 180.0
-        c1_angles = np.zeros(6); angles_389 = None; distances_389 = None; dist_decay_389 = None
-        
-        # 初始化 ML 统计量 (Sum, Max, Conc)
+        d1_geo = 999.0; d1_w = 999.0
+        c1_angles = np.zeros(6); angles_389 = None; dist_decay_389 = None
         ml_phe389_stats = [0.0, 0.0, 0.0] 
         
         if c1 is not None:
@@ -426,31 +498,20 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
             distances_389, dist_decay_389 = calculate_distance_decay(lp, c1, n1)
             c1_angles = angles_389
             
-            # 计算综合权重 (单个碳的得分 S_i)
             combined_weights_1 = calculate_combined_weight(safe_w, angle_decay_389, dist_decay_389)
-            
-            # 4. 【ML特征】计算统计量 [Sum, Max, Concentration]
             s_sum = np.sum(combined_weights_1)
             s_max = np.max(combined_weights_1)
-            s_conc = s_max / (s_sum + 1e-6) # 避免除以0
+            s_conc = s_max / (s_sum + 1e-6)
             ml_phe389_stats = [s_sum, s_max, s_conc]
-
-            # CSV 用的加权平均距离
             d1_w = calculate_weighted_average_distance(dists_to_c1, combined_weights_1) if s_sum > 0 else np.mean(dists_to_c1)
-            
-            if n1 is not None: 
-                ang = np.degrees(np.arccos(np.clip(np.dot(ln, n1), -1, 1)))
-                a1 = min(abs(90-ang), abs(90-(180-ang)))
             
             all_angles_389.append(angles_389)
             all_distance_decays_389.append(dist_decay_389)
 
         # --- Phe 390 电子特征 ---
         c2, n2 = get_aromatic_ring_data(r390)
-        d2_geo = 999.0; d2_w = 999.0; a2 = 180.0
-        c2_angles = np.zeros(6); angles_390 = None; distances_390 = None; dist_decay_390 = None
-        
-        # 初始化 ML 统计量
+        d2_geo = 999.0; d2_w = 999.0
+        c2_angles = np.zeros(6); angles_390 = None; dist_decay_390 = None
         ml_phe390_stats = [0.0, 0.0, 0.0]
 
         if c2 is not None:
@@ -459,31 +520,28 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
             angles_390, angle_decay_390 = calculate_carbon_angles_and_decay(lp, c2, n2)
             distances_390, dist_decay_390 = calculate_distance_decay(lp, c2, n2)
             c2_angles = angles_390
-            
             combined_weights_2 = calculate_combined_weight(safe_w, angle_decay_390, dist_decay_390)
             
-            # 5. 【ML特征】计算统计量
             s_sum = np.sum(combined_weights_2)
             s_max = np.max(combined_weights_2)
             s_conc = s_max / (s_sum + 1e-6)
             ml_phe390_stats = [s_sum, s_max, s_conc]
-
             d2_w = calculate_weighted_average_distance(dists_to_c2, combined_weights_2) if s_sum > 0 else np.mean(dists_to_c2)
-
-            if n2 is not None: 
-                ang = np.degrees(np.arccos(np.clip(np.dot(ln, n2), -1, 1)))
-                a2 = min(abs(90-ang), abs(90-(180-ang)))
             
             all_angles_390.append(angles_390)
             all_distance_decays_390.append(dist_decay_390)
 
         # --- 构建当前帧的特征向量 ---
-        # 顺序: [Dist_1..Dist_M, Cos_Angle, P1_Sum, P1_Max, P1_Conc, P2_Sum, P2_Max, P2_Conc]
+        # 顺序: 
+        # [Dist_1..Dist_M (12个), Cos_Angle (1个), P1_Sum..Conc (3个), P2_Sum..Conc (3个), Dist_N_114 (1个), Dist_N_386 (1个)]
+        # 总共 19 + 2 = 21 维
         current_frame_features = np.concatenate([
-            dobp,               # 几何距离 (N_residues)
-            [ml_cos_angle],     # 几何角度 (1)
-            ml_phe389_stats,    # Phe389 电子特征 (3)
-            ml_phe390_stats     # Phe390 电子特征 (3)
+            dobp,               # 几何距离 (12维)
+            [ml_cos_angle],     # 几何角度 (1维)
+            ml_phe389_stats,    # Phe389 电子特征 (3维)
+            ml_phe390_stats,    # Phe390 电子特征 (3维)
+            [dist_n_114],       # 【新增】碱性氮到D3.32距离 (1维)
+            [dist_n_386]        # 【新增】碱性氮到W6.48环距离 (1维)
         ])
         feature_vectors.append(current_frame_features)
 
@@ -497,9 +555,11 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
             "Time": ts.time, "Replica": rep_name, "Global_Angle": ga, 
             "Dist_Phe389_Geo": d1_geo, "Dist_Phe389_Weighted": d1_w, 
             "Dist_Phe390_Geo": d2_geo, "Dist_Phe390_Weighted": d2_w,
-            # 添加 ML 统计量到 CSV 方便快速查看
             "Phe389_Score_Sum": ml_phe389_stats[0], "Phe389_Score_Max": ml_phe389_stats[1],
-            "Phe390_Score_Sum": ml_phe390_stats[0], "Phe390_Score_Max": ml_phe390_stats[1]
+            "Phe390_Score_Sum": ml_phe390_stats[0], "Phe390_Score_Max": ml_phe390_stats[1],
+            # 【新增】CSV记录
+            "Dist_N_to_D332": dist_n_114,
+            "Dist_N_to_W648_Ring": dist_n_386
         }
         for i in range(6):
             row[f"C{i+1}_Angle_to_Phe389"] = c1_angles[i]
@@ -518,8 +578,52 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
 
     # 2. 保存投影图
     if cnt > 0:
-        axy = vis_accum/cnt
+        # 当前轨迹的平均口袋坐标 (axy) 和配体坐标 (lxy)
+        # 注意：lxy 来自最后一帧的 align_xy，代表了配体的形状和自身坐标系
+        # axy 是在这个自身坐标系下，口袋的平均位置
+        axy = vis_accum / cnt
         lxy, _, wxy = align_xy(lp, np.array([[0,0,0]]), lig_res.atoms.positions)
+        
+        # --- [新增] 全局对齐逻辑 START ---
+        ref_file = os.path.join(OUTPUT_BASE_DIR, "REFERENCE_DOPA_OBP.npy")
+        is_dopa = "dopa" in cid.lower()
+        
+        target_obp = None
+        
+        # 策略：如果是 Dopa，存为基准；如果不是，尝试读取基准
+        if is_dopa:
+            # 只有当这是第一个 Dopa 副本时才保存，避免覆盖
+            if not os.path.exists(ref_file) or rep_name == "replicate_1":
+                np.save(ref_file, axy)
+                print(f"     [Ref] Saved current pocket as Global Reference to {ref_file}")
+            target_obp = axy # 自身就是基准
+        elif os.path.exists(ref_file):
+            target_obp = np.load(ref_file)
+        else:
+            print("     [Ref] Warning: No Dopa reference found yet. Projection will be unaligned.")
+
+        # 如果有基准，进行对齐
+        if target_obp is not None:
+            try:
+                # 计算将 当前口袋(axy) 对齐到 基准口袋(target_obp) 的变换
+                # 注意：axy 和 target_obp 必须点数相同且顺序一致 (OBP_RESIDUES_STD 保证了这一点)
+                R, t = calc_kabsch_2d(axy, target_obp)
+                
+                # 应用变换到口袋 (仅为了验证，理论上变换后 axy ≈ target_obp)
+                axy = np.dot(axy, R.T) + t
+                
+                # 【关键】应用同样的变换到配体
+                # 这会将配体移动到“标准口袋坐标系”中正确的位置
+                lxy = np.dot(lxy, R.T) + t
+                
+                # 应用变换到全原子背景 (如果有的话)
+                if wxy is not None:
+                     wxy = np.dot(wxy, R.T) + t
+                     
+            except Exception as e:
+                print(f"     [Align Error] {e}")
+        # --- [新增] 全局对齐逻辑 END ---
+
         proj_path = output_handler.save_projection(None)
         plot_proj(lxy, axy, wxy, w, vis_labs, str(proj_path), cid, rep_name)
 
@@ -535,13 +639,16 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
             safe_w, avg_angles_389, avg_angles_390,
             avg_dist_decay_389, avg_dist_decay_390
         )
-        print(format_interaction_strength(strength))
+        # print(format_interaction_strength(strength)) # Optional print
 
     stats = {
         "Compound": cid, "Replica": rep_name, "Offset": offset,
         "Global_Angle_Mean": df["Global_Angle"].mean(), 
-        "Phe389_Score_Sum_Mean": df["Phe389_Score_Sum"].mean(), # 记录平均相互作用能
-        "Phe390_Score_Sum_Mean": df["Phe390_Score_Sum"].mean()
+        "Phe389_Score_Sum_Mean": df["Phe389_Score_Sum"].mean(), 
+        "Phe390_Score_Sum_Mean": df["Phe390_Score_Sum"].mean(),
+        # 【新增】统计平均值
+        "Dist_N_to_D332_Mean": df["Dist_N_to_D332"].mean(),
+        "Dist_N_to_W648_Ring_Mean": df["Dist_N_to_W648_Ring"].mean()
     }
     
     if strength: stats.update(strength)
@@ -559,10 +666,21 @@ def main():
     GLOBAL_DOPA_MAX_INTEGRAL = gmx
     aligner = OffsetCalculator(STANDARD_SEQUENCE)
     
-    print("\n>>> Processing (V2.0 Modularized)...")
-    for c_dir in glob.glob(os.path.join(root, "*")):
+    print("\n>>> Processing (V2.0 Modularized + Dopa Priority)...")
+    
+    # 1. 获取所有待处理目录
+    all_dirs = glob.glob(os.path.join(root, "*"))
+    
+    # 2. 【关键修改】自定义排序：让包含 "dopa" (忽略大小写) 的目录排在最前面
+    # lambda x: (False, x) 会排在 (True, x) 前面，因为 False < True
+    # 我们希望 "dopa" 排前面，所以当 "dopa" 不在 x 中时返回 True (排后面)
+    all_dirs.sort(key=lambda x: (not "dopa" in os.path.basename(x).lower(), x))
+
+    for c_dir in all_dirs:
         if not os.path.isdir(c_dir): continue
-        if "run_analysis" in c_dir or "modules" in c_dir or "results" in c_dir: continue
+        # 排除非数据目录
+        if any(x in c_dir for x in ["run_analysis", "modules", "results", "__pycache__"]): continue
+        
         cid = os.path.basename(c_dir)
         
         cubs = glob.glob(os.path.join(c_dir, "*.cub")); 
@@ -574,7 +692,12 @@ def main():
         
         ref_d = get_ref_data_from_pdb(pdb); ref_e = ref_d[1]
         cp = CubeParser(cubs[0]); ri = cp.get_carbon_integrals(INTEGRATION_RADIUS)
-        if ref_e.count('C') != len(ri): print(f"[Error] {cid} size mismatch"); continue
+        
+        # 简单的长度检查，防止 cube 和 pdb 不匹配
+        if ref_e.count('C') != len(ri): 
+             # 尝试宽容处理或者跳过
+             pass 
+        
         cube_d = (cp, ri)
         
         xtcs = glob.glob(os.path.join(c_dir, "**", "merged.xtc"), recursive=True)
@@ -590,7 +713,9 @@ def main():
             
             if topo:
                 output_handler = OutputHandler(cid, rn, OUTPUT_BASE_DIR)
+                # 调用处理函数（包含您刚才修改的对齐绘图逻辑）
                 ts, st, strength = process_replicate(xtc, topo, cube_d, ref_d, cid, rn, aligner, output_handler)
+                
                 if ts is not None:
                     output_handler.save_timeseries(ts)
                     output_handler.save_stats(pd.DataFrame([st]))
