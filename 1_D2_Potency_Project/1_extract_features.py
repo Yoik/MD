@@ -13,7 +13,7 @@ run_analysis_v2.py
 
 import matplotlib
 matplotlib.use('Agg')
-
+import gc
 import MDAnalysis as mda
 from MDAnalysis.lib.distances import distance_array
 import numpy as np
@@ -21,9 +21,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import glob
 import os
-import itertools
 from scipy.spatial.distance import cdist
 
+# 导入模块化组件
 from modules import (
     get_aromatic_ring_data,
     calculate_plane_normal,
@@ -35,12 +35,9 @@ from modules import (
     format_interaction_strength,
     OutputHandler
 )
-
-try:
-    from Bio import Align
-except ImportError:
-    print("Error: Please install biopython! Run: pip install biopython")
-    exit()
+from modules.cube_parser import CubeParser
+from modules.ring_matcher import RingMatcher
+from modules.sequence_aligner import OffsetCalculator
 # ==============================================================================
 # 1. 用户配置区
 # ==============================================================================
@@ -68,207 +65,17 @@ INTEGRATION_RADIUS = 1.5
 GLOBAL_DOPA_MAX_INTEGRAL = 1.0 
 BOHR_TO_ANGSTROM = 0.52917721067
 
-MANUAL_ATOM_OVERRIDES = {
-    "unc": ['C16', 'C13', 'C8', 'C7', 'C12', 'C15']
-}
+MANUAL_ATOM_OVERRIDES = {}
 
 OUTPUT_BASE_DIR = "./data/features"
 
 # ==============================================================================
-# 2. 序列对齐模块
+# 2. 序列对齐模块（已移到 sequence_aligner.py）
 # ==============================================================================
 
-class OffsetCalculator:
-    def __init__(self, standard_seq_str):
-        self.ref_seq = "".join(standard_seq_str.split())
-        self.three_to_one = {
-            'ALA':'A', 'ARG':'R', 'ASN':'N', 'ASP':'D', 'CYS':'C',
-            'GLN':'Q', 'GLU':'E', 'GLY':'G', 'HIS':'H', 'HSD':'H', 'HSE':'H', 'HSP':'H',
-            'ILE':'I', 'LEU':'L', 'LYS':'K', 'MET':'M', 'PHE':'F',
-            'PRO':'P', 'SER':'S', 'THR':'T', 'TRP':'W', 'TYR':'Y', 'VAL':'V'
-        }
-
-    def get_sim_sequence(self, u):
-        protein = u.select_atoms("protein and name CA")
-        resnames = protein.resnames
-        resids = protein.resids
-        
-        seq_str = ""
-        valid_indices = []
-        
-        for i, res in enumerate(resnames):
-            code = self.three_to_one.get(res, 'X')
-            seq_str += code
-            valid_indices.append(resids[i])
-            
-        return seq_str, valid_indices
-
-    def calculate_offset(self, u, target_std_id):
-        sim_seq, sim_resids = self.get_sim_sequence(u)
-        
-        aligner = Align.PairwiseAligner()
-        aligner.mode = 'global'
-        aligner.match_score = 2
-        aligner.mismatch_score = -1
-        aligner.open_gap_score = -0.5
-        aligner.extend_gap_score = -0.1
-        
-        alignments = aligner.align(self.ref_seq, sim_seq)
-        best_aln = alignments[0]
-        
-        mapping = {}
-        aligned_ref = best_aln.aligned[0]
-        aligned_sim = best_aln.aligned[1]
-        
-        for (r_start, r_end), (s_start, s_end) in zip(aligned_ref, aligned_sim):
-            length = r_end - r_start
-            
-            for i in range(length):
-                r_idx = r_start + i
-                s_idx = s_start + i
-                std_res_num = r_idx + 1
-                
-                if s_idx < len(sim_resids):
-                    sim_resid_val = sim_resids[s_idx]
-                    mapping[std_res_num] = sim_resid_val
-        
-        if target_std_id in mapping:
-            found_sim_resid = mapping[target_std_id]
-            offset = found_sim_resid - target_std_id
-            print(f"     [Align Info] Std {target_std_id} aligns to Sim {found_sim_resid}. Offset = {offset}")
-            return offset
-        else:
-            print(f"     [Align Error] Residue {target_std_id} is a GAP in the simulation!")
-            return None
-
 # ==============================================================================
-# 3. Cube和Ring匹配类（保持不变）
+# 3. Cube和Ring匹配类（已移到 cube_parser.py 和 ring_matcher.py）
 # ==============================================================================
-
-class CubeParser:
-    def __init__(self, filepath):
-        self.filepath = filepath
-        self.data = None; self.origin = None; self.spacing = None; self.dims = None
-        self.atom_lines = []; self.is_header_bohr = True 
-        self._load()
-    def _load(self):
-        try:
-            with open(self.filepath, 'r') as f:
-                lines = f.readlines()
-                parts = lines[2].split(); natoms = int(parts[0])
-                if natoms > 0: self.is_header_bohr = True
-                else: self.is_header_bohr = False; natoms = abs(natoms)
-                self.origin = np.array([float(x) for x in parts[1:4]])
-                nx = int(lines[3].split()[0]); vx = np.array([float(x) for x in lines[3].split()[1:4]])
-                ny = int(lines[4].split()[0]); vy = np.array([float(x) for x in lines[4].split()[1:4]])
-                nz = int(lines[5].split()[0]); vz = np.array([float(x) for x in lines[5].split()[1:4]])
-                self.dims = (nx, ny, nz); self.spacing = np.array([vx[0], vy[1], vz[2]]) 
-                self.atom_lines = lines[6 : 6 + natoms]
-                data_start = 6 + natoms
-                raw_data = []
-                for line in lines[data_start:]: raw_data.extend([float(x) for x in line.split()])
-                self.data = np.array(raw_data).reshape(self.dims)
-        except Exception as e: print(f"     [Cube Error] {e}"); self.data = None
-    def get_carbon_integrals(self, radius=1.5):
-        if self.data is None: return np.array([])
-        origin_ang = self.origin * BOHR_TO_ANGSTROM
-        spacing_ang = self.spacing * BOHR_TO_ANGSTROM
-        integrals = []; nx, ny, nz = self.dims
-        for line in self.atom_lines:
-            parts = line.split()
-            if int(parts[0]) == 6:
-                raw_coord = np.array([float(x) for x in parts[2:5]])
-                atom_coord_ang = raw_coord * BOHR_TO_ANGSTROM if self.is_header_bohr else raw_coord
-                min_idx = np.maximum(np.floor((atom_coord_ang - radius - origin_ang) / spacing_ang).astype(int), 0)
-                max_idx = np.minimum(np.ceil((atom_coord_ang + radius - origin_ang) / spacing_ang).astype(int) + 1, [nx, ny, nz])
-                if np.any(min_idx >= max_idx): integrals.append(0.0); continue
-                local_data = self.data[min_idx[0]:max_idx[0], min_idx[1]:max_idx[1], min_idx[2]:max_idx[2]]
-                ix = np.arange(min_idx[0], max_idx[0]); iy = np.arange(min_idx[1], max_idx[1]); iz = np.arange(min_idx[2], max_idx[2])
-                X, Y, Z = np.meshgrid(ix, iy, iz, indexing='ij')
-                grid_pos_x = origin_ang[0] + X * spacing_ang[0]
-                grid_pos_y = origin_ang[1] + Y * spacing_ang[1]
-                grid_pos_z = origin_ang[2] + Z * spacing_ang[2]
-                dist_sq = (grid_pos_x - atom_coord_ang[0])**2 + (grid_pos_y - atom_coord_ang[1])**2 + (grid_pos_z - atom_coord_ang[2])**2
-                mask = dist_sq < (radius**2)
-                integrals.append(np.sum(local_data[mask]))
-        return np.array(integrals)
-
-class RingMatcher:
-    def __init__(self, ref_coords, ref_elements):
-        self.ref_coords = ref_coords; self.ref_elements = ref_elements; self.n_ref = len(ref_coords)
-        self.ref_ring_idx = self._find_single_ring(ref_coords, ref_elements)
-        if self.ref_ring_idx is None:
-            c_indices = [i for i, e in enumerate(ref_elements) if e == 'C']
-            if len(c_indices) == 6: self.ref_ring_idx = c_indices
-            else: raise ValueError(f"No 6-ring found")
-        self.ref_neigh_idx = []
-        dmat = cdist(ref_coords, ref_coords)
-        ring_set = set(self.ref_ring_idx)
-        for i in range(self.n_ref):
-            if i not in ring_set and np.min(dmat[i, self.ref_ring_idx]) < 1.70: self.ref_neigh_idx.append(i)
-    def _find_single_ring(self, coords, elements):
-        c_indices = [i for i, e in enumerate(elements) if e == 'C']
-        if len(c_indices) < 6: return None
-        sub_coords = coords[c_indices]; dmat = cdist(sub_coords, sub_coords); adj = np.logical_and(dmat > 1.1, dmat < 1.65)
-        for comb in itertools.combinations(range(len(c_indices)), 6):
-            sub_idx = list(comb); curr_coords = sub_coords[sub_idx]
-            if np.linalg.svd(curr_coords - curr_coords.mean(0))[1][2] > 0.3: continue 
-            sub_adj = adj[np.ix_(sub_idx, sub_idx)]
-            if np.all(np.sum(sub_adj, axis=1) >= 2): return [c_indices[i] for i in self._order_ring_indices(sub_idx, sub_adj)]
-        return None
-    def _order_ring_indices(self, indices, sub_adj):
-        ordered = [indices[0]]; current = 0; used = {0}
-        for _ in range(5):
-            for n in np.where(sub_adj[current])[0]:
-                if n not in used: ordered.append(indices[n]); used.add(n); current = n; break
-        return ordered
-    def match(self, md_atoms, anchor_com):
-        md_coords = md_atoms.positions; md_c_indices = [i for i, a in enumerate(md_atoms) if a.name.startswith('C')]
-        if len(md_c_indices) < 6: return None, None
-        md_c_coords = md_coords[md_c_indices]; dmat = cdist(md_c_coords, md_c_coords); adj = np.logical_and(dmat > 1.1, dmat < 1.70)
-        found_rings = []
-        seen = set()
-        def dfs(s,c,p):
-            if len(p)==6: return p if adj[c,s] else None
-            for n in np.where(adj[c])[0]:
-                if n==s and len(p)<5: continue
-                if n not in p: 
-                    r = dfs(s,n,p+[n])
-                    if r: return r
-            return None
-        for i in range(len(md_c_indices)):
-            res = dfs(i,i,[i])
-            if res:
-                s=tuple(sorted(res)); 
-                if s not in seen: found_rings.append(list(res)); seen.add(s)
-        if not found_rings: return None, None
-        
-        best_ring = None; min_dist = float('inf')
-        for r in found_rings:
-            g = [md_c_indices[i] for i in r]; cent = md_coords[g].mean(0); d = np.linalg.norm(cent - anchor_com)
-            if d < min_dist: min_dist = d; best_ring = g
-        
-        ref_ring = self.ref_coords[self.ref_ring_idx]; md_ring = md_coords[best_ring]
-        ref_neigh = self.ref_coords[self.ref_neigh_idx] if self.ref_neigh_idx else None
-        best_p = None; min_score = float('inf')
-        shifts = [list(range(6))[i:]+list(range(6))[:i] for i in range(6)]; perms = shifts + [s[::-1] for s in shifts]
-        for p in perms:
-            tgt = md_ring[list(p)]; Pc=ref_ring.mean(0); Qc=tgt.mean(0); H=np.dot((ref_ring-Pc).T,(tgt-Qc))
-            U,S,Vt=np.linalg.svd(H); R=np.dot(Vt.T,U.T)
-            if np.linalg.det(R)<0: Vt[2,:]*=-1; R=np.dot(Vt.T,U.T)
-            t=Qc-np.dot(Pc,R.T)
-            rms = np.mean(np.linalg.norm((np.dot(ref_ring,R.T)+t)-tgt,axis=1))
-            if rms > 0.5: continue
-            score = rms
-            if ref_neigh is not None:
-                tn = np.dot(ref_neigh,R.T)+t; dchk = cdist(tn, md_coords)
-                score = np.mean(np.min(dchk,axis=1))
-            if score < min_score: min_score = score; best_p = p
-        
-        if best_p is None: return None, None
-        ref_c_idxs = [i for i, e in enumerate(self.ref_elements) if e == 'C']
-        cube_idxs = [{idx:rank for rank,idx in enumerate(ref_c_idxs)}[i] for i in self.ref_ring_idx]
-        return md_atoms[[best_ring[i] for i in best_p]], cube_idxs
 
 # ==============================================================================
 # 4. 辅助函数
@@ -280,9 +87,13 @@ def get_ref_data_from_pdb(pdb_file):
         with open(pdb_file) as f:
             for l in f:
                 if l.startswith("ATOM") or l.startswith("HETATM"):
-                    n=l[12:16].strip(); 
-                    if n.startswith("C") and not n.startswith("CL") and not n.startswith("CA"):
-                        c.append([float(l[30:38]),float(l[38:46]),float(l[46:54])]); e.append(n[0])
+                    atom_name = l[12:16].strip()
+                    # 提取所有重原子（C, N, O, S）- 用于环检测和ELF积分
+                    # 排除主链原子 (CA, C, N, O)
+                    if atom_name[0] in ['C', 'N', 'O', 'S']:
+                        if atom_name not in ['CA', 'C', 'N', 'O']:
+                            c.append([float(l[30:38]),float(l[38:46]),float(l[46:54])])
+                            e.append(atom_name[0])
     except: return None, None
     return np.array(c), e
 
@@ -334,17 +145,80 @@ def calc_kabsch_2d(mobile, target):
     
     return R, t
 
-def plot_proj(lig, obp, whole, w, labs, out, cid, suf):
+def plot_proj(lig, obp, whole, w, labs, out, cid, suf, ring_type="BENZENE", lig_atom_names=None):
     fig, ax = plt.subplots(figsize=(10,10)); ax.set_aspect('equal')
     ax.scatter(whole[:,0], whole[:,1], c='lightgray', s=30, zorder=1)
     sc = ax.scatter(lig[:,0], lig[:,1], c=w, cmap='coolwarm', vmin=0, vmax=1.0, s=500, edgecolors='k', zorder=2)
     loop = np.vstack([lig, lig[0]]); ax.plot(loop[:,0], loop[:,1], 'k-', lw=2, zorder=2)
-    for i,p in enumerate(lig): ax.text(p[0],p[1],f"{w[i]:.2f}",ha='center',va='center',color='w',fontweight='bold')
+    
+    # 显示每个环原子的权重和原子名称
+    for i,p in enumerate(lig):
+        atom_label = f"{lig_atom_names[i]}" if lig_atom_names and i < len(lig_atom_names) else ""
+        weight_text = f"{w[i]:.2f}"
+        display_text = f"{atom_label}\n{weight_text}" if atom_label else weight_text
+        ax.text(p[0],p[1], display_text, ha='center', va='center', color='w', fontweight='bold', fontsize=9)
+    
     for i,p in enumerate(obp):
         col = 'red' if labs[i] in ['389','390'] else 'blue'; mk = '^' if col=='red' else 'o'
         ax.scatter(p[0],p[1], c=col, marker=mk, s=150, alpha=0.7); ax.text(p[0]+0.2,p[1]+0.2,labs[i],color=col)
-    plt.colorbar(sc, label='Norm. ELF'); plt.title(f"{cid} Projection - {suf}")
-    plt.savefig(out, dpi=150, bbox_inches='tight'); plt.close()
+    
+    plt.colorbar(sc, label='Norm. ELF')
+    title = f"{cid} Projection ({ring_type}) - {suf}"
+    plt.title(title)
+    plt.savefig(out, dpi=150, bbox_inches='tight')
+    # 关键修改：显式关闭特定的 figure 对象，并清理内存
+    plt.close(fig) 
+    plt.clf()
+    plt.cla()
+
+def save_3d_structure_pdb(lig_coords, lig_names, obp_coords, obp_names, obp_indices, out_file, cid, ring_atom_indices=None, ring_weights=None):
+    """
+    保存 3D 结构为 PDB 文件，包括配体原子和 OBP 残基原子
+    可用于 PyMOL、VMD 等可视化软件进行交互式查看
+    
+    参数：
+    - lig_coords: 配体原子坐标 (N, 3)
+    - lig_names: 配体原子名称列表
+    - obp_coords: OBP 残基原子坐标 (M, 3)
+    - obp_names: OBP 原子名称/标签列表
+    - obp_indices: OBP 残基索引列表
+    - out_file: 输出 PDB 文件路径
+    - cid: 化合物 ID
+    - ring_atom_indices: 环原子索引列表（用于 B-factor 标记）
+    - ring_weights: 环原子权重列表（用于 occupancy 字段）
+    """
+    try:
+        with open(out_file, 'w') as f:
+            f.write("REMARK Generated 3D structure with ring atoms and OBP residues\n")
+            f.write(f"REMARK Compound: {cid}\n")
+            
+            atom_num = 1
+            
+            # 写入配体原子
+            for i, (coord, name) in enumerate(zip(lig_coords, lig_names)):
+                # 检查该原子是否在环中
+                in_ring = i in ring_atom_indices if ring_atom_indices is not None else False
+                b_factor = 50.0 if in_ring else 0.0  # B-factor 标记环原子
+                occupancy = ring_weights[ring_atom_indices.index(i)] if (in_ring and ring_weights is not None) else 1.0
+                
+                x, y, z = coord
+                f.write(f"ATOM  {atom_num:5d}  {name:4s} LIG A   1    {x:8.3f}{y:8.3f}{z:8.3f}{occupancy:6.2f}{b_factor:6.2f}           C\n")
+                atom_num += 1
+            
+            # 写入 OBP 残基原子（用不同的链标记）
+            for i, (coord, name, res_idx) in enumerate(zip(obp_coords, obp_names, obp_indices)):
+                x, y, z = coord
+                # OBP 原子的 B-factor = 0，occupancy = 1.0
+                f.write(f"ATOM  {atom_num:5d}  CA  RES B{i+1:3d}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00           C\n")
+                atom_num += 1
+            
+            f.write("END\n")
+        
+        print(f"     [3D] Saved 3D structure: {out_file}")
+        return True
+    except Exception as e:
+        print(f"     [3D] Error saving 3D structure: {e}")
+        return False
 
 def find_ligand(u):
     p = u.select_atoms("resname LIG LIG1 LDP R5F DRG UNK")
@@ -393,23 +267,100 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
     # 配体氮原子: 用于寻找碱性氮
     lig_nitrogens = lig_res.atoms.select_atoms("name N*")
 
-    # --- 环匹配逻辑 (保持不变) ---
-    manual = MANUAL_ATOM_OVERRIDES.get("unc") if "unc" in cid.lower() else None
-    matched = None; w = None
-    if manual:
-        matched = lig_res.atoms.select_atoms(f"name {' '.join(manual)}")
-        if len(matched)==6:
-            try:
-                rm = RingMatcher(ref_c, ref_e); matched, c_idx = rm.match(matched, anchor)
-                if matched: w = raw_int[c_idx]/GLOBAL_DOPA_MAX_INTEGRAL
-            except: pass
-    else:
-        cands = lig_res.atoms.select_atoms("name C*")
-        if len(cands)>5:
-            try:
-                rm = RingMatcher(ref_c, ref_e); matched, c_idx = rm.match(cands, anchor)
-                if matched: w = raw_int[c_idx]/GLOBAL_DOPA_MAX_INTEGRAL
-            except: pass
+# --- 环匹配逻辑 + 环类型打印 + 环原子映射 ---
+    matched = None; w = None; ring_type_info = "unknown"
+    
+    # 1. 创建 RingMatcher 实例
+    try:
+        rm = RingMatcher(ref_c, ref_e)
+        ring_type_info = rm.ring_type
+    except:
+        ring_type_info = "unknown"
+    
+    # 2. 【核心修改】使用 rm.match() 替代原本的手动距离匹配
+    # 原来的代码在这里尝试手动平移和 cdist 查找，导致了错误。
+    # 现在直接调用我们写好的 match 方法：
+    if ring_type_info != "unknown":
+        # match 方法返回：(MD原子对象, Cube积分索引列表, MD原子索引列表)
+        # 它内部会自动处理：拓扑查找、Kabsch旋转对齐、RMSD筛选
+        matched_atoms, cube_idxs, _ = rm.match(lig_res.atoms, anchor)
+        
+        if matched_atoms is not None:
+            matched = matched_atoms
+            
+            # 根据返回的 cube_idxs 获取对应的电子密度权重
+            # raw_int 是所有重原子的积分数组
+            if cube_idxs:
+                try:
+                    w = raw_int[cube_idxs] / GLOBAL_DOPA_MAX_INTEGRAL
+                except IndexError:
+                    # 极其罕见的情况：索引越界，回退到默认
+                    w = np.ones(len(matched)) * 0.5
+            else:
+                w = np.ones(len(matched)) * 0.5
+
+            # --- 【新增】确定几何中心原子索引列表 ---
+            geo_center_indices = []
+    
+            # 1. 优先判断是否为单苯环 (Benzene)
+            if hasattr(rm, 'ring_type') and rm.ring_type == 'benzene':
+                # 如果是苯环，直接使用所有原子
+                geo_center_indices = list(range(len(matched)))
+                
+            # 2. 如果是稠环 (Indole/Thiophene/Furan)，需要筛选
+            elif hasattr(rm, 'rings') and len(rm.rings) > 0:
+                try:
+                    # 从参考环信息中获取“苯环部分”的原始原子索引
+                    # rm.rings[0] 是当前选中的参考环信息
+                    ref_six_set = set(rm.rings[0].get('six_ring', []))
+                    
+                    if ref_six_set:
+                        # 动态筛选：遍历 MD 原子对应的 Ref 索引
+                        for i, ref_idx in enumerate(rm.ref_ring_idx):
+                            if ref_idx in ref_six_set:
+                                geo_center_indices.append(i)
+                    else:
+                        # 理论上稠环必须有 six_ring 信息，如果没有就是异常
+                        print(f"     [Error] {cid}: Fused ring detected but 'six_ring' data is missing!")
+                        
+                except Exception as e:
+                    print(f"     [Error] {cid}: Geo center logic failed with exception: {e}")
+
+            # 3. 【核心修改】严格检查：如果筛选失败，报错并退出，绝不凑合！
+            if not geo_center_indices:
+                print(f"     [Result Error] {cid}: Could not identify Benzene atoms! (RingType: {getattr(rm, 'ring_type', 'Unknown')})")
+                print(f"     -> Matched atoms: {len(matched)}")
+                print(f"     -> Ref Ring Idx: {rm.ref_ring_idx}")
+                if hasattr(rm, 'rings') and len(rm.rings) > 0:
+                    print(f"     -> Six Ring Info: {rm.rings[0].get('six_ring', 'None')}")
+                return None, None, None
+            else:
+                geo_center_indices = list(range(len(matched)))
+        else:
+            # 匹配失败 (RMSD过大或找不到对应的环)
+            matched = None
+            w = None
+
+    # 打印识别到的环类型
+    if rep_name == "gromacs_replicate_1":  # 只在第一个副本打印一次
+        if ring_type_info == "indole":
+            ring_desc = "INDOLE (6+5 fused aromatic, N-heterocycle)"
+        elif ring_type_info == "furan":
+            ring_desc = "FURAN (6+5 fused aromatic, O-heterocycle)"
+        elif ring_type_info == "thiophene":
+            ring_desc = "THIOPHENE (6+5 fused aromatic, S-heterocycle)"
+        else:
+            ring_desc = "BENZENE (6-membered)"
+        
+        print(f"     [Ring] {cid}: {ring_desc}")
+        
+        # 打印所有环原子及其权重信息
+        if matched is not None and w is not None:
+            atom_info = []
+            for i, atom in enumerate(matched):
+                weight_val = w[i] if i < len(w) else 0.0
+                atom_info.append(f"{atom.name}({weight_val:.3f})")
+            print(f"            Ring atoms (all {len(matched)}): {', '.join(atom_info)}")
             
     if not matched: return None, None, None
 
@@ -428,13 +379,23 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
     all_angles_389 = []; all_angles_390 = []
     all_distance_decays_389 = []; all_distance_decays_390 = []
     
-    feature_vectors = [] 
+    feature_vectors = []
+    
+    # 如果环匹配失败，使用默认权重（全1）
+    if w is None:
+        w = np.ones(6)
 
     for ts in u.trajectory:
         lp = matched.positions
-        lc_geo = lp.mean(0)
-        safe_w = np.maximum(w, 0.0)
         
+        # 【修改】只使用苯环部分的原子计算几何中心
+        # 这样 OBP 距离 (dobp) 和 Phe 距离 (d1_geo) 都会基于苯环中心
+        if 'geo_center_indices' in locals() and geo_center_indices:
+            lc_geo = lp[geo_center_indices].mean(0)
+        else:
+            lc_geo = lp.mean(0)
+            
+        safe_w = np.maximum(w, 0.0)        
         # --- 几何特征: 平面二面角 ---
         ln = calculate_plane_normal(lp)
         pn = calculate_plane_normal(plane_res.positions)
@@ -488,7 +449,7 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
         # --- Phe 389 电子特征 ---
         c1, n1 = get_aromatic_ring_data(r389)
         d1_geo = 999.0; d1_w = 999.0
-        c1_angles = np.zeros(6); angles_389 = None; dist_decay_389 = None
+        c1_angles = None; angles_389 = None; dist_decay_389 = None
         ml_phe389_stats = [0.0, 0.0, 0.0] 
         
         if c1 is not None:
@@ -511,7 +472,7 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
         # --- Phe 390 电子特征 ---
         c2, n2 = get_aromatic_ring_data(r390)
         d2_geo = 999.0; d2_w = 999.0
-        c2_angles = np.zeros(6); angles_390 = None; dist_decay_390 = None
+        c2_angles = None; angles_390 = None; dist_decay_390 = None
         ml_phe390_stats = [0.0, 0.0, 0.0]
 
         if c2 is not None:
@@ -520,6 +481,7 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
             angles_390, angle_decay_390 = calculate_carbon_angles_and_decay(lp, c2, n2)
             distances_390, dist_decay_390 = calculate_distance_decay(lp, c2, n2)
             c2_angles = angles_390
+            
             combined_weights_2 = calculate_combined_weight(safe_w, angle_decay_390, dist_decay_390)
             
             s_sum = np.sum(combined_weights_2)
@@ -561,9 +523,14 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
             "Dist_N_to_D332": dist_n_114,
             "Dist_N_to_W648_Ring": dist_n_386
         }
-        for i in range(6):
-            row[f"C{i+1}_Angle_to_Phe389"] = c1_angles[i]
-            row[f"C{i+1}_Angle_to_Phe390"] = c2_angles[i]
+        
+        # 记录可变数量的角度（根据实际环原子数量）
+        if c1_angles is not None:
+            for i, angle in enumerate(c1_angles):
+                row[f"C{i+1}_Angle_to_Phe389"] = angle
+        if c2_angles is not None:
+            for i, angle in enumerate(c2_angles):
+                row[f"C{i+1}_Angle_to_Phe390"] = angle
         
         for i, rid in enumerate(OBP_RESIDUES_STD): row[f"Dist_Res_{rid}"] = dobp[i]
         data.append(row)
@@ -625,7 +592,45 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
         # --- [新增] 全局对齐逻辑 END ---
 
         proj_path = output_handler.save_projection(None)
-        plot_proj(lxy, axy, wxy, w, vis_labs, str(proj_path), cid, rep_name)
+        
+        # 准备环类型和原子名称用于绘图
+        ring_type_display = ring_type_info.upper() if ring_type_info else "BENZENE"
+        lig_atom_names = [atom.name for atom in matched] if matched else None
+        
+        plot_proj(lxy, axy, wxy, w, vis_labs, str(proj_path), cid, rep_name, 
+                  ring_type=ring_type_display, lig_atom_names=lig_atom_names)
+        
+        # 保存 3D 结构可视化 (使用平均坐标)
+        if all_angles_389 and obp_atoms is not None:  # 确保有数据
+            try:
+                # 使用配体的 3D 坐标 (从最后一帧)
+                lig_coords_3d = lig_res.atoms.positions
+                lig_atom_names_full = [atom.name for atom in lig_res.atoms]
+                
+                # OBP 原子的 3D 坐标
+                obp_coords_3d = obp_atoms.positions
+                obp_atom_names = [f"RES{i+1}" for i in range(len(OBP_RESIDUES_STD))]
+                
+                # 环原子的索引 (在配体中)
+                ring_atom_indices = []
+                if matched is not None:
+                    for ring_atom in matched:
+                        for i, lig_atom in enumerate(lig_res.atoms):
+                            if lig_atom.index == ring_atom.index:
+                                ring_atom_indices.append(i)
+                                break
+                
+                # 生成 PDB 文件
+                pdb_path = str(proj_path).replace('.png', '_structure.pdb')
+                save_3d_structure_pdb(
+                    lig_coords_3d, lig_atom_names_full,
+                    obp_coords_3d, obp_atom_names, obp_ids,
+                    pdb_path, cid,
+                    ring_atom_indices=ring_atom_indices,
+                    ring_weights=w if matched else None
+                )
+            except Exception as e:
+                print(f"     [3D] Warning: Could not generate 3D structure: {e}")
 
     # 3. 计算总体统计 (Stats CSV)
     strength = None
@@ -652,6 +657,23 @@ def process_replicate(xtc, topo, cube_d, ref_d, cid, rep_name, offset_calc, outp
     }
     
     if strength: stats.update(strength)
+    
+    # 1. 关闭 MDAnalysis 轨迹文件句柄（非常重要！）
+    if 'u' in locals():
+        u.trajectory.close()
+        del u  # 删除对象引用
+        
+    # 2. 清理巨大的临时列表
+    del feature_vectors
+    del data
+    del all_angles_389
+    del all_angles_390
+    
+    # 3. 强制清理 Matplotlib 的缓存（防止画图内存泄漏）
+    plt.close('all')
+    
+    # 4. 手动触发一次垃圾回收
+    gc.collect()
     
     return df, stats, strength
 
@@ -691,12 +713,14 @@ def main():
         if not pdb: print(f"[Skip] {cid} no ref PDB"); continue
         
         ref_d = get_ref_data_from_pdb(pdb); ref_e = ref_d[1]
-        cp = CubeParser(cubs[0]); ri = cp.get_carbon_integrals(INTEGRATION_RADIUS)
+        cp = CubeParser(cubs[0])
+        # 获取所有重原子的积分（而不仅仅是碳）
+        # CubeParser 内部会计算所有重原子（原子序数 >= 6）
+        ri = cp.get_carbon_integrals(INTEGRATION_RADIUS)
         
-        # 简单的长度检查，防止 cube 和 pdb 不匹配
-        if ref_e.count('C') != len(ri): 
-             # 尝试宽容处理或者跳过
-             pass 
+        if len(ri) == 0: 
+            print(f"[Skip] {cid} no heavy atoms in cube file")
+            continue
         
         cube_d = (cp, ri)
         
@@ -722,6 +746,9 @@ def main():
                     ts_list.append(ts); stat_list.append(st)
                     if strength:
                         strength_list.append(strength)
+
+            print(f"     [GC] Cleaning up memory after {rn}...")
+            gc.collect()
         
         if ts_list:
             OutputHandler.aggregate_timeseries(ts_list, OUTPUT_BASE_DIR, cid)

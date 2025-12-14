@@ -60,12 +60,13 @@ def calculate_carbon_angles_and_decay(carbon_positions, phe_center, phe_normal):
         angles: (6,) 数组，每个碳与Phe平面的夹角（度数）
         decay_factors: (6,) 数组，角度衰减因子
     """
-    angles = np.zeros(6)
-    decay_factors = np.zeros(6)
-    
+    n_atoms = len(carbon_positions)
+    angles = np.zeros(n_atoms)
+    decay_factors = np.zeros(n_atoms)
+
     if phe_normal is None:
         # 如果没有平面法向量，无法计算
-        return angles, np.ones(6)
+        return angles, np.ones(n_atoms)
     
     for i, c_pos in enumerate(carbon_positions):
         # 从Phe质心指向碳原子的向量
@@ -104,8 +105,10 @@ def calculate_distance_decay(carbon_positions, phe_center, phe_normal):
         perp_distances: (6,) 数组，垂直距离（Å）
         decay_factors: (6,) 数组，距离衰减因子
     """
+    n_atoms = len(carbon_positions)
+
     if phe_normal is None:
-        return np.zeros(6), np.ones(6)
+        return np.zeros(n_atoms), np.ones(n_atoms)
     
     # 从Phe质心到各碳原子的向量
     vec_to_atoms = carbon_positions - phe_center
