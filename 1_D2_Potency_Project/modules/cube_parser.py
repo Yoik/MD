@@ -88,6 +88,8 @@ class CubeParser:
         
         atom_counter = 0  # 追踪重原子的索引
         
+        voxel_volume = self.spacing[0] * self.spacing[1] * self.spacing[2]
+        
         for line in self.atom_lines:
             parts = line.split()
             atomic_num = int(parts[0])
@@ -143,7 +145,11 @@ class CubeParser:
                       (grid_pos_z - atom_coord_ang[2]) ** 2)
             mask = dist_sq < (radius ** 2)
             
-            integrals.append(np.sum(local_data[mask]))
+            # [修改] 积分 = Sum(密度 * dV)
+            raw_sum = np.sum(local_data[mask])
+            physical_integral = raw_sum * voxel_volume
+            
+            integrals.append(physical_integral)
             atom_counter += 1
         
         return np.array(integrals)
