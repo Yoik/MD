@@ -2,149 +2,209 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib
-matplotlib.use('Agg')  # <--- 【关键修改1】防止在服务器上画图崩溃
+matplotlib.use('Agg') # 服务器端绘图
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 import pickle
 import glob
 from tqdm import tqdm
-from captum.attr import IntegratedGradients
+
+# 检查 Captum 库
+try:
+    from captum.attr import IntegratedGradients
+except ImportError:
+    print("[ERROR] 'captum' library not found. Please install it: pip install captum")
+    exit()
+
 from src.model import EfficiencyPredictor
 
-# --- 配置 ---
-DATA_DIR = "data/features"      # 数据目录
-MODEL_PATH = "saved_models/best_model.pth"
+# ==============================================================================
+# 配置参数
+# ==============================================================================
+DATA_DIR = "data/features"
+MODEL_PATH = "saved_models/best_model_mccv.pth" 
 SCALER_PATH = "saved_models/scaler.pkl"
-POCKET_ATOM_NUM = 12
 
-# 定义特征名称
-FEATURE_NAMES = [f"Dist_{i+1}" for i in range(POCKET_ATOM_NUM)] + \
+# 特征名称 (对应 19 维输入)
+# 定义具体的残基映射
+OBP_LABELS = [
+    "V114 (Dist_1)", "D115 (Dist_2)", "M118 (Dist_3)", "P119 (Dist_4)", 
+    "D190 (Dist_5)", "S193 (Dist_6)", "V194 (Dist_7)", "F197 (Dist_8)", 
+    "H386 (Dist_9)", "H393 (Dist_10)", "W412 (Dist_11)", "Y416 (Dist_12)"
+]
+
+FEATURE_NAMES = OBP_LABELS + \
                 ["Angle_Cos"] + \
                 ["Phe389_Sum", "Phe389_Max", "Phe389_Conc"] + \
-                ["Phe390_Sum", "Phe390_Max", "Phe390_Conc"] + \
-                ["Dist_N_D114", "Dist_N_W386"]
-
+                ["Phe390_Sum", "Phe390_Max", "Phe390_Conc"]
+# ==============================================================================
+# 主程序
+# ==============================================================================
 def main():
-    device = torch.device("cpu") # 解释性分析推荐用 CPU
+    device = torch.device("cpu")
     
-    # 1. 加载模型和标准化器
-    print("Loading model...")
-    model = EfficiencyPredictor(input_dim=21).to(device)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    print(f"Loading model from {MODEL_PATH} ...")
+    if not os.path.exists(MODEL_PATH):
+        print(f"Error: Model file not found at {MODEL_PATH}")
+        return
+
+    # 1. 初始化模型
+    model = EfficiencyPredictor(input_dim=19).to(device)
+    try:
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    except Exception as e:
+        print(f"\n[CRITICAL ERROR] Model architecture mismatch!\n{e}")
+        return
+
     model.eval()
     
+    # 2. 加载 Scaler
+    if not os.path.exists(SCALER_PATH):
+        print("Error: Scaler file not found.")
+        return
+        
     with open(SCALER_PATH, 'rb') as f:
         scaler = pickle.load(f)
 
-    # 2. 扫描所有 .npy 文件
+    # 3. 寻找数据文件
     search_path = os.path.join(DATA_DIR, "*", "*", "*_features.npy")
     files = glob.glob(search_path)
-    print(f"Found {len(files)} trajectory files.")
+    print(f"Found {len(files)} trajectory files for analysis.")
+    
+    if len(files) == 0:
+        print("No feature files found.")
+        return
 
-    # 存储器
-    all_feature_importances = [] # 存储每个文件的特征贡献 (IG)
-    all_attention_corrs = []     # 存储每个文件的特征-注意力相关性
-
-    # 3. 定义 Captum 需要的前向函数 (只返回预测值)
+    # 4. 定义 Forward 函数 (只返回预测值)
     def forward_func(inputs):
-        macro_pred, _, _ = model(inputs)
+        macro_pred, _, _, _ = model(inputs)
         return macro_pred
 
     ig = IntegratedGradients(forward_func)
 
-    # 4. 循环分析所有文件
+    # 存储结果容器
+    all_feature_importances = [] 
+    all_gate_corrs = []          
+    all_attn_corrs = []          
+
     print("Running Global Interpretation...")
     for file_path in tqdm(files):
         try:
-            # --- A. 数据预处理 ---
+            # === 数据预处理 ===
             raw_data = np.load(file_path)
+            if raw_data.shape[0] == 0: continue
+            
             data_proc = raw_data.copy()
-            data_proc[:, :POCKET_ATOM_NUM] = 1.0 / (data_proc[:, :POCKET_ATOM_NUM] + 1e-6)
+            data_proc[:, :12] = 1.0 / (data_proc[:, :12] + 1e-6) # 距离倒数
             data_proc = scaler.transform(data_proc)
             
-            input_tensor = torch.from_numpy(data_proc).float().unsqueeze(0).to(device) # [1, Frames, 19]
+            input_tensor = torch.from_numpy(data_proc).float().unsqueeze(0).to(device)
             input_tensor.requires_grad = True
 
-            # --- B. 问题1: 哪些特征决定了最终效能? (Integrated Gradients) ---
-            # 计算归因
-            attributions = ig.attribute(input_tensor, n_steps=20) # n_steps=20 以加快速度
-            # 在时间轴(Frames)上求和，得到该轨迹整体的特征贡献
+            # === A. IG 归因分析 ===
+            attributions = ig.attribute(input_tensor, n_steps=10)
             traj_importance = attributions.sum(dim=1).squeeze(0).detach().numpy()
             all_feature_importances.append(traj_importance)
 
-            # --- C. 问题2: 哪些特征决定了注意力权重? (Correlation Analysis) ---
-            # 获取模型对每一帧的注意力权重
+            # === B. 提取机制变量 ===
             with torch.no_grad():
-                _, _, attn_weights = model(input_tensor) 
-                # attn_weights shape: [1, Frames, 1]
+                _, _, gate_vals, attn_weights = model(input_tensor)
             
-            weights = attn_weights.squeeze().numpy() # [Frames]
-            features = data_proc # [Frames, 19]
+            gates = gate_vals.squeeze().numpy()
+            attns = attn_weights.squeeze().numpy()
+            features = data_proc
             
-            # 计算每一列特征与注意力权重的皮尔逊相关系数
-            # 如果某特征越大，注意力越高，相关性为正
-            corrs = []
-            for i in range(21):
-                if np.std(features[:, i]) < 1e-6: # 防止方差为0除以0
-                    corrs.append(0)
+            # 维度保护
+            if gates.ndim == 0: gates = np.expand_dims(gates, 0)
+            if attns.ndim == 0: attns = np.expand_dims(attns, 0)
+            
+            # === C. 计算相关性 ===
+            gate_c = []
+            attn_c = []
+            for i in range(19):
+                feat_col = features[:, i]
+                if np.std(feat_col) < 1e-6:
+                    gate_c.append(0); attn_c.append(0)
                 else:
-                    corr = np.corrcoef(features[:, i], weights)[0, 1]
-                    corrs.append(corr)
-            all_attention_corrs.append(corrs)
+                    gate_c.append(np.corrcoef(feat_col, gates)[0, 1])
+                    attn_c.append(np.corrcoef(feat_col, attns)[0, 1])
+            
+            all_gate_corrs.append(gate_c)
+            all_attn_corrs.append(attn_c)
 
         except Exception as e:
-            print(f"Error processing {os.path.basename(file_path)}: {e}")
+            # print(f"Warning: {e}")
+            continue
 
-    # 5. 聚合结果
-    # [N_files, 19] -> 平均 -> [19]
+    if not all_feature_importances:
+        print("No valid data processed.")
+        return
+
+    # === 5. 聚合数据 ===
     avg_importances = np.mean(all_feature_importances, axis=0)
-    avg_attn_drivers = np.mean(all_attention_corrs, axis=0)
+    avg_gate_drivers = np.mean(all_gate_corrs, axis=0)
+    avg_attn_drivers = np.mean(all_attn_corrs, axis=0)
 
-    # 6. 绘图 1: 全局特征重要性 (Global Feature Importance)
-    plot_bar_chart(
-        values=avg_importances, 
-        title="Global Feature Importance (What determines Efficacy?)",
-        ylabel="Contribution to Efficacy (Integrated Gradients)",
-        filename="Global_Feature_Importance.png",
-        color_logic=True
-    )
-
-    # 7. 绘图 2: 注意力驱动因子 (Attention Drivers)
-    plot_bar_chart(
-        values=avg_attn_drivers, 
-        title="Attention Drivers (What makes a frame 'Important'?)",
-        ylabel="Correlation with Attention Weight",
-        filename="Global_Attention_Drivers.png",
-        color_logic=False # 这里不需要红蓝反转逻辑，直接看相关性
-    )
-
-def plot_bar_chart(values, title, ylabel, filename, color_logic=False):
-    plt.figure(figsize=(14, 8))
+    # === 6. 组合绘图 (1行3列) ===
+    print("\nGenerating Combined Plot...")
     
+    # 创建一个宽幅画布: 24x10 英寸
+    fig, axes = plt.subplots(1, 3, figsize=(24, 10))
+    
+    # 绘制子图 1: 全局重要性 (IG)
+    plot_on_axis(axes[0], avg_importances, 
+                 title="A. Global Feature Importance\n(Determinants of Efficacy)", 
+                 xlabel="Integrated Gradients (Contribution)", 
+                 color_logic='contribution')
+
+    # 绘制子图 2: 门控驱动 (Gate)
+    plot_on_axis(axes[1], avg_gate_drivers, 
+                 title="B. Gate Drivers\n(What opens the Electronic Gate?)", 
+                 xlabel="Correlation with Gate Value", 
+                 color_logic='correlation')
+
+    # 绘制子图 3: 注意力驱动 (Attention)
+    plot_on_axis(axes[2], avg_attn_drivers, 
+                 title="C. Attention Drivers\n(What attracts Temporal Attention?)", 
+                 xlabel="Correlation with Attention Weight", 
+                 color_logic='correlation')
+
+    plt.tight_layout()
+    output_file = "Global_Interpretation_Panel.png"
+    plt.savefig(output_file, dpi=300)
+    print(f"Saved combined plot: {output_file}")
+
+# ==============================================================================
+# 通用子图绘制函数
+# ==============================================================================
+def plot_on_axis(ax, values, title, xlabel, color_logic='correlation'):
+    # 准备数据框并排序
     df = pd.DataFrame({'Feature': FEATURE_NAMES, 'Value': values})
-    
-    # 排序
     df['Abs_Value'] = df['Value'].abs()
     df = df.sort_values('Abs_Value', ascending=False)
     
-    # 颜色
-    if color_logic:
-        # 红色=正贡献(增效)，蓝色=负贡献(减效)
-        colors = ['red' if x > 0 else 'blue' for x in df['Value']]
+    # 配色方案
+    if color_logic == 'contribution':
+        # 红蓝配色: 红=正贡献, 蓝=负贡献
+        palette = ['#d62728' if x > 0 else '#1f77b4' for x in df['Value']]
     else:
-        # 紫色=正相关(特征值大引关注)，绿色=负相关(特征值小引关注)
-        colors = ['purple' if x > 0 else 'green' for x in df['Value']]
+        # 紫绿配色: 紫=正相关, 绿=负相关
+        palette = ['#9467bd' if x > 0 else '#2ca02c' for x in df['Value']]
 
-    sns.barplot(x='Value', y='Feature', data=df, palette=colors)
+    # 绘图
+    sns.barplot(x='Value', y='Feature', data=df, palette=palette, hue='Feature', legend=False, ax=ax)
     
-    plt.title(title, fontsize=16)
-    plt.xlabel(ylabel, fontsize=12)
-    plt.axvline(x=0, color='black', linestyle='-', linewidth=0.8)
-    plt.grid(axis='x', linestyle='--', alpha=0.5)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=300)
-    print(f"Saved plot: {filename}")
+    # 装饰
+    ax.set_title(title, fontsize=14, weight='bold', pad=15)
+    ax.set_xlabel(xlabel, fontsize=12)
+    ax.set_ylabel("") # 去掉 Y 轴标签，节省空间
+    ax.axvline(x=0, color='black', linestyle='-', linewidth=0.8, alpha=0.6)
+    ax.grid(axis='x', linestyle='--', alpha=0.5)
+    
+    # 调整刻度字体
+    ax.tick_params(axis='y', labelsize=10)
+    ax.tick_params(axis='x', labelsize=10)
 
 if __name__ == "__main__":
     main()
