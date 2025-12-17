@@ -1,119 +1,213 @@
 import sys
 import os
-# 1. 强制将当前目录加入路径，解决 ModuleNotFoundError
-sys.path.append(os.getcwd())
-
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from src.dataset import prepare_data
+from torch.utils.data import DataLoader, Subset
+from sklearn.model_selection import ShuffleSplit
+from src.dataset import prepare_data, TrajectoryDataset
 from src.model import EfficiencyPredictor
 
-# --- 配置参数 ---
+# ==============================================================================
+# 配置参数
+# ==============================================================================
 LABEL_FILE = "data/labels.csv"
 RESULT_DIR = "data/features"
-MODEL_SAVE_PATH = "saved_models/best_model.pth"
+MODEL_SAVE_PATH = "saved_models/best_model_mccv.pth" 
 SCALER_SAVE_PATH = "saved_models/scaler.pkl"
 
-# 物理参数配置
-POCKET_ATOM_NUM = 12  # 您定义的口袋几何距离特征数量 (根据实际npy列数调整)
-INPUT_DIM = 21        # 总特征维度 (距离 + 角度 + 电子统计量)
-
-# 训练超参数
+# 物理参数
+POCKET_ATOM_NUM = 12
+INPUT_DIM = 19       # 13(Geom) + 6(Elec) + Attention
+# 训练参数
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 100      # 增加轮数，因为我们有了 Scheduler 防止过拟合
-STEP_SIZE = 30        # 每 30 轮衰减一次学习率
-GAMMA = 0.1           # 衰减倍率 (lr = lr * 0.1)
+WEIGHT_DECAY = 1e-4
+NUM_EPOCHS = 40      # 推荐 40-50
+BATCH_SIZE = 32
+N_SPLITS = 20        # 20 轮交叉验证
+TEST_SIZE = 2        # 每次随机选 2 个化合物做测试 (Dopa 除外)
 
+# ==============================================================================
+# 主程序
+# ==============================================================================
 def main():
     # 1. 准备数据
-    print("Preparing data...")
+    print("Preparing data with slicing...")
     try:
-        # 这一步会自动处理标签归一化(0-1)和特征标准化
-        train_ds, test_ds = prepare_data(LABEL_FILE, RESULT_DIR, POCKET_ATOM_NUM, SCALER_SAVE_PATH)
-    except ValueError as e:
-        print(f"Data Error: {e}")
+        # 修正：完整传入所有必要参数
+        train_ds, test_ds = prepare_data(
+            label_file=LABEL_FILE, 
+            result_dir=RESULT_DIR, 
+            pocket_atom_num=POCKET_ATOM_NUM, 
+            save_scaler_path=SCALER_SAVE_PATH,
+            window_size=100, 
+            stride=20
+        )
+    except Exception as e:
+        print(f"\n[DATA ERROR] Failed to load data: {e}")
         return
 
-    # Batch Size 设为 1 (处理变长轨迹)
-    train_loader = DataLoader(train_ds, batch_size=1, shuffle=True)
-    test_loader = DataLoader(test_ds, batch_size=1, shuffle=False)
+    # 2. 整合全量数据 (用于自定义划分)
+    full_features = train_ds.features + test_ds.features
+    full_labels = train_ds.labels + test_ds.labels
+    full_ids = train_ds.ids + test_ds.ids
+    full_dataset = TrajectoryDataset(full_features, full_labels, full_ids)
     
-    # 2. 初始化模型
+    # 获取所有化合物名称
+    all_unique_ids = sorted(list(set(full_dataset.ids)))
+    print(f"\n>>> Dataset Ready. Total Compounds: {len(all_unique_ids)}")
+    
+    # === 3. 核心逻辑：锁定 Dopa ===
+    target_anchors = ["Dopa", "ARI"]
+    
+    # 检查这些锚点是否都在数据里
+    valid_anchors = [a for a in target_anchors if a in all_unique_ids]
+    
+    if len(valid_anchors) > 0:
+        # 候选池：剔除所有锚点
+        candidates = [c for c in all_unique_ids if c not in valid_anchors]
+        # 锚点：永远进入训练集
+        always_train_cmpds = valid_anchors
+        print(f"[Fixed Anchor] {valid_anchors} are LOCKED in the training set (Range Defined).")
+    else:
+        candidates = all_unique_ids
+        always_train_cmpds = []
+        print(f"[Warning] Anchors not found. Running standard random split.")    
+    unique_compounds = np.array(candidates)
+    
+    # 定义划分器 (对剩下的候选者进行抽签)
+    rs = ShuffleSplit(n_splits=N_SPLITS, test_size=TEST_SIZE, random_state=42)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    print(f"MCCV Strategy: {N_SPLITS} rounds | Device: {device}")
     
-    model = EfficiencyPredictor(input_dim=INPUT_DIM).to(device)
-    
-    # 定义优化器
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    
-    # 【新增】定义学习率调度器 (防止后期震荡)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=STEP_SIZE, gamma=GAMMA)
-    
-    # 定义损失函数
-    criterion = nn.MSELoss()
-    
-    # 3. 训练循环
-    best_test_loss = float('inf')
-    
-    print(f"{'Epoch':^5} | {'Train MSE':^10} | {'Test MSE':^10} | {'LR':^8} | {'Note'}")
-    print("-" * 55)
-    
-    for epoch in range(NUM_EPOCHS):
-        # === 训练阶段 ===
-        model.train()
-        train_loss_sum = 0
+    # 存储结果容器
+    compound_results = {name: [] for name in all_unique_ids}
+    compound_truths = {name: 0.0 for name in all_unique_ids}
+
+    # === 4. 开始 MCCV 循环 ===
+    for round_idx, (train_idx_cand, test_idx_cand) in enumerate(rs.split(unique_compounds)):
+        # 训练集 = 本轮抽到的候选者 + 锁定的 Dopa
+        train_cmpds = list(unique_compounds[train_idx_cand]) + always_train_cmpds
+        # 测试集 = 本轮抽到的测试者 (绝对没有 Dopa)
+        test_cmpds = list(unique_compounds[test_idx_cand])
         
-        for traj, label, _ in train_loader:
+        print(f"\n--- Round {round_idx+1}/{N_SPLITS} ---")
+        # print(f"  Train: {train_cmpds}") # 调试用，平时可注释
+        # print(f"  Test : {test_cmpds}")
+
+        # 根据 ID 找切片索引
+        train_indices = [i for i, x in enumerate(full_dataset.ids) if x in train_cmpds]
+        test_indices = [i for i, x in enumerate(full_dataset.ids) if x in test_cmpds]
+        
+        # 构建 DataLoader
+        train_loader = DataLoader(Subset(full_dataset, train_indices), batch_size=BATCH_SIZE, shuffle=True)
+        test_loader = DataLoader(Subset(full_dataset, test_indices), batch_size=BATCH_SIZE, shuffle=False)
+
+        # 初始化模型
+        model = EfficiencyPredictor(input_dim=INPUT_DIM).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+        criterion = nn.MSELoss()
+
+        # 4.1 训练 (Train)
+        model.train()
+        for epoch in range(NUM_EPOCHS):
+            for traj, label, _ in train_loader:
+                traj, label = traj.to(device), label.to(device)
+                optimizer.zero_grad()
+                
+                # 【重要】接收 4 个返回值 (pred, scores, gate, attn)
+                pred, _, _, _ = model(traj)
+                
+                loss = criterion(pred.squeeze(), label.squeeze())
+                loss.backward()
+                optimizer.step()
+
+        # 4.2 测试 (Test)
+        model.eval()
+        with torch.no_grad():
+            # 临时存本轮的预测，防止同一个化合物有多个切片
+            round_preds_map = {name: [] for name in test_cmpds}
+            
+            for traj, label, ids in test_loader:
+                traj = traj.to(device)
+                pred, _, _, _ = model(traj) # 接收 4 个返回值
+                
+                preds_np = pred.squeeze().cpu().numpy().flatten()
+                labels_np = label.cpu().numpy().flatten()
+                
+                for p, l, name in zip(preds_np, labels_np, ids):
+                    round_preds_map[name].append(p)
+                    compound_truths[name] = l # 记录真实值
+
+            # 输出本轮结果
+            for name in test_cmpds:
+                if round_preds_map[name]:
+                    avg_val = np.mean(round_preds_map[name])
+                    compound_results[name].append(avg_val)
+                    print(f"  Test: {name:<5} | True: {compound_truths[name]:.2f} | Pred: {avg_val:.2f}")
+
+    # === 5. 最终汇总报告 (严格按照你的格式要求) ===
+    print("\n" + "="*70)
+    print("MCCV Final Average Report")
+    print("="*70)
+    # 表头包含 Tested N times
+    print(f"{'Compound':<10} | {'True':<8} | {'Avg Pred':<8} | {'Std Dev':<8} | {'Diff':<8} | {'Tested N times'}")
+    print("-" * 70)
+    
+    final_stats_for_rmse = []
+    
+    for name in all_unique_ids:
+        true_val = compound_truths[name]
+        preds = compound_results[name]
+        count = len(preds)
+        
+        if count > 0:
+            avg_pred = np.mean(preds)
+            std_dev = np.std(preds)
+            diff = avg_pred - true_val
+            
+            print(f"{name:<10} | {true_val:<8.2f} | {avg_pred:<8.2f} | {std_dev:<8.2f} | {diff:<+8.2f} | {count}")
+            
+            final_stats_for_rmse.append({"True": true_val, "Pred": avg_pred})
+        else:
+            # 对于 Dopa (Anchor)，它没有测试数据
+            if name in target_anchors:
+                 print(f"{name:<10} | {true_val:<8.2f} | {'(Anchor)':<8} | {'0.00':<8} | {'----':<8} | {0} (Train Only)")
+            else:
+                 print(f"{name:<10} | {true_val:<8.2f} | {'N/A':<8} | {'0.00':<8} | {'----':<8} | {0}")
+
+    # 计算整体指标
+    if final_stats_for_rmse:
+        df_res = pd.DataFrame(final_stats_for_rmse)
+        rmse = np.sqrt(np.mean((df_res['True'] - df_res['Pred'])**2))
+        corr = df_res['True'].corr(df_res['Pred'])
+        print("-" * 70)
+        print(f"Overall RMSE : {rmse:.4f}")
+        print(f"Pearson R    : {corr:.4f}")
+
+    # === 6. 全量重训并保存 (Retrain Final Model) ===
+    print("\nRetraining Final Model on ALL data...")
+    # 使用全量数据 (包含 Dopa)
+    final_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    final_model = EfficiencyPredictor(input_dim=INPUT_DIM).to(device)
+    optimizer = torch.optim.Adam(final_model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    
+    final_model.train()
+    for epoch in range(NUM_EPOCHS):
+        for traj, label, _ in final_loader:
             traj, label = traj.to(device), label.to(device)
-            
             optimizer.zero_grad()
-            
-            # 模型返回: (macro_pred, scores, attn_weights)
-            # 我们只需要第一个 macro_pred 参与 Loss 计算
-            pred, _, _ = model(traj) 
-            
-            loss = criterion(pred.squeeze(), label.squeeze())
+            # 同样接收 4 个返回值
+            pred, _, _, _ = final_model(traj)
+            loss = nn.MSELoss()(pred.squeeze(), label.squeeze())
             loss.backward()
             optimizer.step()
             
-            train_loss_sum += loss.item()
-            
-        avg_train_loss = train_loss_sum / len(train_loader)
-        
-        # === 验证阶段 (新增) ===
-        model.eval()
-        test_loss_sum = 0
-        with torch.no_grad():
-            for traj, label, _ in test_loader:
-                traj, label = traj.to(device), label.to(device)
-                
-                pred, _, _ = model(traj)
-                loss = criterion(pred.squeeze(), label.squeeze())
-                test_loss_sum += loss.item()
-                
-        avg_test_loss = test_loss_sum / len(test_loader)
-        
-        # === 学习率更新 ===
-        current_lr = optimizer.param_groups[0]['lr']
-        scheduler.step()
-        
-        # === 保存最佳模型 (基于 Test Loss) ===
-        save_msg = ""
-        if avg_test_loss < best_test_loss:
-            best_test_loss = avg_test_loss
-            torch.save(model.state_dict(), MODEL_SAVE_PATH)
-            save_msg = "*" # 标记这一轮保存了模型
-            
-        print(f"{epoch+1:^5} | {avg_train_loss:.5f}    | {avg_test_loss:.5f}   | {current_lr:.1e} | {save_msg}")
-            
-    print("-" * 55)
-    print(f"Training finished.")
-    print(f"Best Test MSE: {best_test_loss:.5f}")
-    print(f"Model saved to: {MODEL_SAVE_PATH}")
+    torch.save(final_model.state_dict(), MODEL_SAVE_PATH)
+    print(f"Final model saved to: {MODEL_SAVE_PATH}")
+    print("Done.")
 
 if __name__ == "__main__":
-    # 确保保存目录存在
-    os.makedirs(os.path.dirname(MODEL_SAVE_PATH), exist_ok=True)
     main()

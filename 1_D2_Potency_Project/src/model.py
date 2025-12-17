@@ -6,68 +6,78 @@ class EfficiencyPredictor(nn.Module):
     def __init__(self, input_dim):
         super(EfficiencyPredictor, self).__init__()
         
-        # === 1. 特征提取器 (Feature Extractor) ===
-        # 先把物理特征映射到高维空间，但不急着压缩成1个数
-        self.feature_net = nn.Sequential(
-            nn.Linear(input_dim, 128),
-            nn.BatchNorm1d(128),
+        # 19维特征：0-12几何，13-18电子
+        self.geom_dim = 13
+        self.elec_dim = 6
+        self.input_dim = input_dim # 19
+        
+        # === 1. 亲和力通道 (Geometry Stream) ===
+        # 判断结合姿态 (0-1)
+        self.geom_net = nn.Sequential(
+            nn.Linear(self.geom_dim, 64),
+            nn.BatchNorm1d(64),
             nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(128, 64),
-            nn.ReLU()
-        )
-        
-        # === 2. 效能打分头 (Score Head) ===
-        # 预测该帧的“潜在效能值” (0-1)
-        self.score_head = nn.Sequential(
-            nn.Linear(64, 1),
-            nn.Sigmoid() # 限制在 0-1
-        )
-        
-        # === 3. 注意力门控网络 (Attention Gating) ===
-        # 预测该帧的“权重/重要性” (0-1)
-        # 物理含义：这一帧构象出现的概率，或者对宏观性质的贡献度
-        self.attention_net = nn.Sequential(
+            nn.Linear(64, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(),
             nn.Linear(64, 32),
-            nn.Tanh(),
-            nn.Linear(32, 1) # 输出该帧的未归一化权重
+            nn.ReLU(),
+            nn.Linear(32, 1),
+            nn.Sigmoid() 
+        )
+        
+        # === 2. 电子效能门控 (Electronic Gate) ===
+        # 判断激活开关 (0-1)
+        self.elec_gate = nn.Sequential(
+            nn.Linear(self.elec_dim, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+            nn.Sigmoid() 
         )
 
+        # === 3. 时间注意力机制 (Temporal Attention) ===
+        # 判断这一帧的重要性 (权重)
+        # 输入是全量特征 (19维)，因为它需要综合判断
+        self.attn_net = nn.Sequential(
+            nn.Linear(self.input_dim, 32),
+            nn.Tanh(), # Tanh 通常用于 Attention 之前的激活
+            nn.Linear(32, 1) # 输出 logit，后面接 Softmax
+        )
+        
     def forward(self, x):
-            # x 可能的形状: 
-            # [Frames, Features] (旧的单条数据)
-            # [Batch, Frames, Features] (训练时 Batch=1，Captum解释时 Batch=50)
-            
-            # 1. 维度统一化处理
-            if x.dim() == 2:
-                x = x.unsqueeze(0) # 变成 [1, Frames, Features]
-                
-            batch_size, num_frames, num_feats = x.size()
-            
-            # 2. 展平 (Flatten) --- 这是修复报错的关键！
-            # 将 [Batch, Frames, Feats] 压扁成 [Batch*Frames, Feats]
-            # 这样 BatchNorm1d 就会把所有帧都视为独立的样本进行归一化，而不会混淆维度
-            x_flat = x.reshape(-1, num_feats)
-            
-            # 3. 提取特征
-            feats_flat = self.feature_net(x_flat) # 输出 [Batch*Frames, 64]
-            
-            # 4. 还原形状
-            # 变回 [Batch, Frames, 64] 以便计算注意力
-            feats = feats_flat.view(batch_size, num_frames, -1)
-            
-            # 5. 计算分数和注意力
-            scores = self.score_head(feats) # [Batch, Frames, 1]
-            attn_logits = self.attention_net(feats) # [Batch, Frames, 1]
-            
-            # 6. 注意力归一化
-            # 在 Frames 维度 (dim=1) 做 Softmax，确保每条轨迹的权重和为 1
-            attn_weights = F.softmax(attn_logits, dim=1)
-            
-            # 7. 聚合 (Weighted Sum)
-            # [Batch, Frames, 1] * [Batch, Frames, 1] -> sum -> [Batch, 1]
-            macro_pred = torch.sum(scores * attn_weights, dim=1)
-            
-            # 8. 返回结果
-            # macro_pred.squeeze(-1) 变成 [Batch]
-            return macro_pred.squeeze(-1), scores, attn_weights
+        # x shape: [Batch, Frames, 19]
+        batch_size, num_frames, _ = x.shape
+        
+        # 1. 拆分特征
+        x_geom = x[:, :, :13]   # 几何
+        x_elec = x[:, :, 13:]   # 电子
+        
+        # 展平处理
+        x_geom_flat = x_geom.reshape(-1, self.geom_dim)
+        x_elec_flat = x_elec.reshape(-1, self.elec_dim)
+        x_flat = x.reshape(-1, self.input_dim) # Attention 用全量
+        
+        # 2. 计算各流分数
+        # Geom: [Batch, Frames, 1]
+        geom_score = self.geom_net(x_geom_flat).view(batch_size, num_frames, 1)
+        # Gate: [Batch, Frames, 1]
+        gate_val = self.elec_gate(x_elec_flat).view(batch_size, num_frames, 1)
+        
+        # 3. 计算每一帧的瞬时效能
+        # Frame_Score = 几何分 * 电子门控
+        frame_scores = geom_score * gate_val
+        
+        # 4. 计算注意力权重
+        # Attn_Logits: [Batch, Frames, 1]
+        attn_logits = self.attn_net(x_flat).view(batch_size, num_frames, 1)
+        # Softmax over 'Frames' dimension (dim=1)
+        # 这样每一条轨迹的所有帧权重加起来等于 1.0
+        attn_weights = F.softmax(attn_logits, dim=1)
+        
+        # 5. 加权求和 (Weighted Sum Pooling)
+        # 以前是 Mean()，现在是 Sum( Score * Weight )
+        weighted_scores = frame_scores * attn_weights
+        macro_pred = torch.sum(weighted_scores, dim=1).squeeze(-1)
+        
+        # 返回 4 个值：最终预测, 逐帧分数, 门控值, 注意力权重
+        return macro_pred, frame_scores, gate_val, attn_weights
