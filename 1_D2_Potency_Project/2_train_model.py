@@ -26,16 +26,28 @@ INPUT_DIM = 19       # 13(Geom) + 6(Elec) + Attention
 # 训练参数
 LEARNING_RATE = 0.001
 WEIGHT_DECAY = 1e-4
-NUM_EPOCHS = 40      # 推荐 40-50
+NUM_EPOCHS = 45      # 推荐 40-50
 BATCH_SIZE = 32
 N_SPLITS = 20        # 20 轮交叉验证
 TEST_SIZE = 2        # 每次随机选 2 个化合物做测试 (Dopa 除外)
 
+def augment_trajectory(traj, noise_std=0.01):
+    """
+    traj: [B, T, F]
+    """
+    noise = torch.randn_like(traj) * noise_std
+    return traj + noise
+
+def attention_entropy(attn_weights, eps=1e-8):
+    """
+    attn_weights: [B, T, 1]
+    """
+    p = attn_weights.squeeze(-1)
+    entropy = -torch.sum(p * torch.log(p + eps), dim=1)
+    return entropy.mean()
+
 # ==============================================================================
 # 主程序
-# ==============================================================================
-# ==============================================================================
-# 主程序 (完整修复版)
 # ==============================================================================
 def main():
     # 1. 准备数据
@@ -64,6 +76,11 @@ def main():
     # 获取所有唯一的化合物 ID
     all_ids = full_dataset.ids
     unique_compounds = sorted(list(set(all_ids)))
+
+    compound2idx = {name: i for i, name in enumerate(unique_compounds)}
+    num_compounds = len(unique_compounds)
+    print(f"Compound embedding vocab size: {num_compounds}")
+
     
     # === [关键修复]：分离 Reference (Dopa) 和 候选化合物 ===
     ref_compound = "Dopa"
@@ -119,20 +136,65 @@ def main():
         # 注意：test_loader 这里其实不需要了，因为下面是按化合物单独测试的，但保留也没事
         
         # 初始化模型
-        model = EfficiencyPredictor(input_dim=INPUT_DIM).to(device)
+        model = EfficiencyPredictor(input_dim=INPUT_DIM, num_compounds=num_compounds, embed_dim=8, attn_dropout=0.2).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         criterion = nn.MSELoss()
 
         # 4.2 训练 (Train)
         model.train()
         for epoch in range(NUM_EPOCHS):
-            for traj, label, _ in train_loader:
+            for traj, label, cmpd_name in train_loader:
                 traj, label = traj.to(device), label.to(device)
+
+                traj = augment_trajectory(traj, noise_std=0.01)
+
+                cmpd_idx = torch.tensor(
+                    [compound2idx[n] for n in cmpd_name],
+                    dtype=torch.long,
+                    device=device
+                )
+
                 optimizer.zero_grad()
-                pred, _, _, _ = model(traj)
-                loss = criterion(pred.squeeze(), label.squeeze())
+                out = model(traj, cmpd_idx)
+
+                pred = out["pred"]
+                frame_scores = out["frame_scores"]
+                gate_val = out["gate"]
+                attn_weights = out["attn"]
+
+                # 1️⃣ 原有 macro-level loss
+                mse_loss = criterion(pred.squeeze(), label.squeeze())
+
+                # 2️⃣ 新增：轨迹均值约束
+                frame_mean = frame_scores.mean(dim=1).squeeze(-1)
+                mean_loss = criterion(frame_mean, label.squeeze())
+
+                # 3️⃣ 注意力熵正则
+                # attn_weights: [B, T, 1]
+                T = attn_weights.shape[1]
+
+                H_max = torch.log(torch.tensor(T, device=attn_weights.device, dtype=torch.float))
+                H_target = 0.6 * H_max   # 经验值：0.5~0.7 都可以
+
+                H = attention_entropy(attn_weights)
+
+                ent_loss = (H - H_target).pow(2)
+
+                # 4️⃣ 总 loss
+                loss = (
+                    mse_loss
+                    + 1.0 * mean_loss
+                    + 0.01 * ent_loss
+                )
+
                 loss.backward()
                 optimizer.step()
+                if epoch == 0:
+                    print(
+                        "pred mean:", pred.mean().item(),
+                        "frame mean:", frame_mean.mean().item(),
+                        "label mean:", label.mean().item()
+                    )
 
         # 4.3 测试 (Test) - 按化合物逐个评估
         model.eval()
@@ -149,10 +211,15 @@ def main():
                 slice_preds = []
                 ground_truth = None
                 
-                for traj, label, _ in cmpd_loader:
+                for traj, label, cmpd_name_batch in cmpd_loader:
                     traj = traj.to(device)
-                    pred, _, _, _ = model(traj)
-                    slice_preds.extend(pred.squeeze().cpu().numpy().flatten())
+                    cmpd_idx = torch.tensor([compound2idx[n] for n in cmpd_name_batch], dtype=torch.long, device=device)
+                    out = model(traj, cmpd_idx)
+                    pred = out["pred"]
+
+                    slice_preds.extend(
+                        pred.detach().cpu().numpy().flatten()
+                    )
                     if ground_truth is None and len(label) > 0:
                         ground_truth = label[0].item()
                 
@@ -236,25 +303,55 @@ def main():
     plt.ylabel("Predicted Efficacy (%)")
     plt.legend()
     
-    plt.savefig("efficacy_correlation_plot_sem.png", dpi=300, bbox_inches='tight')
-    print("\nPlot saved to: efficacy_correlation_plot_sem.png")
+    plt.savefig("efficacy_correlation_plot_sem_entropy_0001.png", dpi=300, bbox_inches='tight')
+    print("\nPlot saved to: efficacy_correlation_plot_sem_entropy_0001.png")
     
     # === 6. 全量重训并保存模型 ===
     print("\nRetraining Final Model on ALL data...")
-    final_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    final_model = EfficiencyPredictor(input_dim=INPUT_DIM).to(device)
-    optimizer = torch.optim.Adam(final_model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-    
+
+    final_loader = DataLoader(
+        full_dataset,
+        batch_size=BATCH_SIZE,
+        shuffle=True
+    )
+
+    final_model = EfficiencyPredictor(
+        input_dim=INPUT_DIM,
+        num_compounds=num_compounds,
+        embed_dim=8,
+        attn_dropout=0.2
+    ).to(device)
+
+    optimizer = torch.optim.Adam(
+        final_model.parameters(),
+        lr=LEARNING_RATE,
+        weight_decay=WEIGHT_DECAY
+    )
+
+    criterion = nn.MSELoss()
+
     final_model.train()
     for epoch in range(NUM_EPOCHS):
-        for traj, label, _ in final_loader:
-            traj, label = traj.to(device), label.to(device)
+        for traj, label, cmpd_name in final_loader:
+            traj = traj.to(device)
+            label = label.to(device)
+
+            cmpd_idx = torch.tensor(
+                [compound2idx[n] for n in cmpd_name],
+                dtype=torch.long,
+                device=device
+            )
+
             optimizer.zero_grad()
-            pred, _, _, _ = final_model(traj)
-            loss = nn.MSELoss()(pred.squeeze(), label.squeeze())
+
+            # ✅ 正确接收 dict 输出
+            out = final_model(traj, cmpd_idx)
+            pred = out["pred"]
+
+            loss = criterion(pred.squeeze(), label.squeeze())
             loss.backward()
             optimizer.step()
-            
+
     torch.save(final_model.state_dict(), MODEL_SAVE_PATH)
     print(f"Final model saved to: {MODEL_SAVE_PATH}")
     print("Done.")
