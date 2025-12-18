@@ -136,7 +136,7 @@ def main():
         # 注意：test_loader 这里其实不需要了，因为下面是按化合物单独测试的，但保留也没事
         
         # 初始化模型
-        model = EfficiencyPredictor(input_dim=INPUT_DIM, num_compounds=num_compounds, embed_dim=8, attn_dropout=0.2).to(device)
+        model = EfficiencyPredictor(input_dim=INPUT_DIM, attn_dropout=0.2).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         criterion = nn.MSELoss()
 
@@ -148,14 +148,8 @@ def main():
 
                 traj = augment_trajectory(traj, noise_std=0.01)
 
-                cmpd_idx = torch.tensor(
-                    [compound2idx[n] for n in cmpd_name],
-                    dtype=torch.long,
-                    device=device
-                )
-
                 optimizer.zero_grad()
-                out = model(traj, cmpd_idx)
+                out = model(traj)
 
                 pred = out["pred"]
                 frame_scores = out["frame_scores"]
@@ -213,8 +207,7 @@ def main():
                 
                 for traj, label, cmpd_name_batch in cmpd_loader:
                     traj = traj.to(device)
-                    cmpd_idx = torch.tensor([compound2idx[n] for n in cmpd_name_batch], dtype=torch.long, device=device)
-                    out = model(traj, cmpd_idx)
+                    out = model(traj)
                     pred = out["pred"]
 
                     slice_preds.extend(
@@ -317,8 +310,6 @@ def main():
 
     final_model = EfficiencyPredictor(
         input_dim=INPUT_DIM,
-        num_compounds=num_compounds,
-        embed_dim=8,
         attn_dropout=0.2
     ).to(device)
 
@@ -336,16 +327,10 @@ def main():
             traj = traj.to(device)
             label = label.to(device)
 
-            cmpd_idx = torch.tensor(
-                [compound2idx[n] for n in cmpd_name],
-                dtype=torch.long,
-                device=device
-            )
-
             optimizer.zero_grad()
 
             # ✅ 正确接收 dict 输出
-            out = final_model(traj, cmpd_idx)
+            out = final_model(traj)
             pred = out["pred"]
 
             loss = criterion(pred.squeeze(), label.squeeze())

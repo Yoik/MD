@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class EfficiencyPredictor(nn.Module):
-    def __init__(self, input_dim, num_compounds, embed_dim=8, attn_dropout=0.2):
+    def __init__(self, input_dim, attn_dropout=0.2):
         super(EfficiencyPredictor, self).__init__()
         
         # 19维特征：0-12几何，13-18电子
@@ -11,11 +11,10 @@ class EfficiencyPredictor(nn.Module):
         self.elec_dim = 6
         self.input_dim = input_dim # 19
 
-        self.num_compounds = num_compounds
-        self.embed_dim = embed_dim
-        self.attn_input_dim = self.input_dim + self.embed_dim
+        # self.num_compounds = num_compounds
+        # self.embed_dim = embed_dim
+        self.attn_input_dim = self.input_dim
 
-        self.compound_embedding = nn.Embedding(num_compounds, embed_dim)
         self.frame_scale = nn.Parameter(torch.tensor(1.0))
 
         # === 1. 亲和力通道 (Geometry Stream) ===
@@ -61,7 +60,7 @@ class EfficiencyPredictor(nn.Module):
         self.topk_k = 5
 
         
-    def forward(self, x, compound_idx):
+    def forward(self, x, compound_idx=None):
         # x shape: [Batch, Frames, 19]
         # compound_ids shape: [Batch]
         # x shape: [Batch, Frames, 19]
@@ -77,13 +76,13 @@ class EfficiencyPredictor(nn.Module):
 
         # compound_idx: [B]
         # embed: [B, embed_dim]
-        embed = self.compound_embedding(compound_idx)
+        # embed = self.compound_embedding(compound_idx)
 
         # expand to frames: [B, T, embed_dim]
-        embed_expanded = embed.unsqueeze(1).expand(batch_size, num_frames, self.embed_dim)
+        # embed_expanded = embed.unsqueeze(1).expand(batch_size, num_frames, self.embed_dim)
 
         # concat for attention input: [B, T, input_dim + embed_dim]
-        x_attn = torch.cat([x, embed_expanded], dim=-1)
+        x_attn = x
 
         # flatten for attn_net
         x_attn_flat = x_attn.reshape(-1, self.attn_input_dim)
