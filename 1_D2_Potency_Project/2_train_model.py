@@ -22,9 +22,10 @@ SCALER_SAVE_PATH = "saved_models/scaler.pkl"
 
 # 物理参数
 POCKET_ATOM_NUM = 12
-INPUT_DIM = 19       # 13(Geom) + 6(Elec) + Attention
+INPUT_DIM = 151       # 13(Geom) + 6(Elec) + Attention
 # 训练参数
 LEARNING_RATE = 0.002
+DROPOUT_RATE = 0.2 # 注意力和全连接层的 dropout 比例
 WEIGHT_DECAY = 1e-4
 NUM_EPOCHS = 60      # 推荐 40-50
 BATCH_SIZE = 32
@@ -82,22 +83,19 @@ def main():
     print(f"Compound embedding vocab size: {num_compounds}")
 
     
-    # === [关键修复]：分离 Reference (Dopa) 和 候选化合物 ===
-    ref_compound = "Dopa"
-    if ref_compound in unique_compounds:
-        # 候选者：排除 Dopa 的其他化合物
-        candidates = [c for c in unique_compounds if c != ref_compound]
-        # Dopa 永远在训练集
-        always_train_cmpds = [ref_compound]
-    else:
-        candidates = unique_compounds
-        always_train_cmpds = []
-        print(f"[Warning] '{ref_compound}' not found in dataset!")
+    # 多个 reference
+    ref_compounds = ["Dopa", "ARI"]
+
+    always_train_cmpds = [c for c in ref_compounds if c in unique_compounds]
+    candidates = [c for c in unique_compounds if c not in always_train_cmpds]
+
+    if not always_train_cmpds:
+        print("[Warning] No reference compounds found in dataset!")
 
     print(f"\n>>> Dataset Ready.")
     print(f"Total Slices: {len(full_dataset)}")
     print(f"Total Compounds: {len(unique_compounds)}")
-    print(f"Splittable Candidates: {len(candidates)} (Dopa excluded from test)")
+    print(f"Splittable Candidates: {len(candidates)} (Dopa and ARI excluded from test)")
     print("-" * 50)
     print(f"Starting MCCV ({N_SPLITS} rounds)...")
     
@@ -136,7 +134,7 @@ def main():
         # 注意：test_loader 这里其实不需要了，因为下面是按化合物单独测试的，但保留也没事
         
         # 初始化模型
-        model = EfficiencyPredictor(input_dim=INPUT_DIM, attn_dropout=0.2).to(device)
+        model = EfficiencyPredictor(input_dim=INPUT_DIM, dropout_rate=DROPOUT_RATE).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         criterion = nn.MSELoss()
 
@@ -310,7 +308,7 @@ def main():
 
     final_model = EfficiencyPredictor(
         input_dim=INPUT_DIM,
-        attn_dropout=0.2
+        dropout_rate=DROPOUT_RATE
     ).to(device)
 
     optimizer = torch.optim.Adam(

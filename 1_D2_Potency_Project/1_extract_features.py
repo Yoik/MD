@@ -40,7 +40,6 @@ try:
         calculate_carbon_angles_and_decay,
         calculate_distance_decay,
         calculate_combined_weight,
-        calculate_weighted_average_distance,
         calculate_interaction_strength,
         OutputHandler
     )
@@ -65,7 +64,7 @@ VNPIIYTTFNIEFRKAFLKILSC
 """
 
 PHE_RESIDUES_STD = [389, 390]
-OBP_RESIDUES_STD = [114, 115, 118, 119, 190, 193, 194, 197, 386, 393, 412, 416]
+OBP_RESIDUES_STD = [114, 115, 118, 119, 190, 193, 194, 197, 386, 389, 390, 393, 412, 416]
 PLANE_RESIDUES_STD = [198, 163, 76, 127]
 
 # ================= 核心工具函数：RDKit 映射 =================
@@ -185,14 +184,6 @@ def get_dopa_global_max(root_dir):
                 except: pass
     print("    [WARN] Dopa reference not found! Using 1.0.")
     return 1.0
-
-#def find_ligand(u):
-#    p = u.select_atoms("resname LIG LIG1 LDP R5F DRG UNK 7LD")
-#    if len(p)>0: return p.residues[0]
-#    cands = [r for r in u.residues if r.resname not in ["TIP3","SOL","WAT","SOD","CLA","POT","ZN","POPC","POPE","CHL","CHL1"] and len(r.atoms)>3]
-#    if not cands: return None
-#    cands.sort(key=lambda r: len(r.atoms), reverse=True)
-#    return cands[0]
 
 def align_xy(lig, obp, whole):
     c = lig.mean(0); u,s,vh = np.linalg.svd(lig-c)
@@ -340,12 +331,6 @@ def process_replicate(xtc, topo, qm_data,
     t389 = 389 + offset; t390 = 390 + offset
     r389 = u.select_atoms(f"resid {t389}"); r390 = u.select_atoms(f"resid {t390}")
     
-    #t114 = 114 + offset; t386 = 386 + offset
-    #r114_group = u.select_atoms(f"resid {t114} and name CG OD1 OD2")
-    #if not r114_group: r114_group = u.select_atoms(f"resid {t114} and name CA")
-    #r386_group = u.select_atoms(f"resid {t386}")
-    #lig_nitrogens = lig_res.atoms.select_atoms("name N*")
-
     global_ring_indices = [lig_res.atoms[i].index for i in md_ring_indices]
     ring_ag = u.atoms[global_ring_indices]
     global_geo_indices = [lig_res.atoms[i].index for i in md_geo_indices]
@@ -357,65 +342,99 @@ def process_replicate(xtc, topo, qm_data,
     all_dist_decays_389 = []; all_dist_decays_390 = []
 
     # 3. Trajectory Loop
+
+    # constant features defined
+    MAX_ATOMS = 9
+    N_OBP = len(OBP_RESIDUES_STD) # 14 个 OBP 残基
+    N_ATOM_FEAT = N_OBP + 2 # 每个原子的特征数 = 14 (距离) + 1 (389得分) + 1 (390得分) = 16
+
     for ts in u.trajectory:
-        lp_ring = ring_ag.positions
+        lp_ring = ring_ag.positions # ligand ring positions
         lp_geo = geo_ag.positions
-        lc_geo = lp_geo.mean(0)
+        lc_geo = lp_geo.mean(0) # Ligand Center (Geometry Atoms)
         safe_w = np.maximum(ring_weights_np, 0.0)
 
+        # A. 几何角度计算
         ln = calculate_plane_normal(lp_geo)
         pn = calculate_plane_normal(plane_res.positions)
         dot_val = np.clip(np.dot(ln, pn), -1, 1)
         ga = np.degrees(np.arccos(dot_val)); ga = ga if ga<=90 else 180-ga
         ml_cos_angle = np.abs(dot_val)
         
-        dobp = distance_array(lc_geo[None,:], obp_atoms.positions, box=u.dimensions)[0]
-        if len(dobp) < len(OBP_RESIDUES_STD):
-            padded = np.ones(len(OBP_RESIDUES_STD)) * 20.0
-            padded[:len(dobp)] = dobp
-            dobp = padded
+        # B. 原子级特征提取
+        # 1. 计算芳香环原子与OBP的距离矩阵[N_atoms x N_OBP]
+        dists_obp = distance_array(lp_ring, obp_atoms.positions, box=u.dimensions)
 
-        #dist_n_114 = 0.0; dist_n_386 = 0.0
-        #if len(lig_nitrogens) > 0:
-        #    dmat_114 = cdist(lig_nitrogens.positions, r114_group.positions)
-        #    closest_n_idx = np.argmin(np.min(dmat_114, axis=1))
-        #    basic_n_pos = lig_nitrogens.positions[closest_n_idx]
-        #    dist_n_114 = 0.0
-        #    if len(r386_group) > 0:
-        #        c386, _ = get_aromatic_ring_data(r386_group)
-        #        if c386 is None: c386 = r386_group.center_of_mass()
-        #        raw_d = np.linalg.norm(basic_n_pos - c386)
-        #        dist_n_386 = np.exp(-((raw_d / 4.0) ** 2))
+        # 容错：如果 OBP 残基缺失，补 100.0
+        if dists_obp.shape[1] < N_OBP:
+            padded_dists = np.ones((len(lp_ring), N_OBP)) * 100.0
+            padded_dists[:, :dists_obp.shape[1]] = dists_obp
+            dists_obp = padded_dists
 
+        # 2. 计算 389 相互作用 (保留每个原子的得分)
         c1, n1 = get_aromatic_ring_data(r389)
-        ml_389 = [0.0, 0.0, 0.0]; d1_geo = 999.0; d1_w = 999.0
+        atom_scores_389 = np.zeros(len(lp_ring)) # [N_atoms]
+        ml_389 = [0.0, 0.0, 0.0]
         if c1 is not None:
-            d1_geo = np.linalg.norm(lc_geo - c1)
-            dists = np.linalg.norm(lp_ring - c1, axis=1)
-            angs, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c1, n1)
+            _, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c1, n1)
             _, dist_dec = calculate_distance_decay(lp_ring, c1, n1)
-            comb = calculate_combined_weight(safe_w, ang_dec, dist_dec)
-            s_sum = np.sum(comb); s_max = np.max(comb)
+
+            # 这里直接拿到每个原子的加权分
+            atom_scores_389 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
+
+            # comb = calculate_combined_weight(safe_w, ang_dec, dist_dec)
+            s_sum = np.sum(atom_scores_389); s_max = np.max(atom_scores_389)
             ml_389 = [s_sum, s_max, s_max/(s_sum+1e-6)]
-            d1_w = calculate_weighted_average_distance(dists, comb) if s_sum>0 else np.mean(dists)
-            all_angles_389.append(angs); all_dist_decays_389.append(dist_dec)
 
+            # 用于最后画图/统计 (辅助)
+            all_angles_389.append(ang_dec) # 这里存一下原始角度decay用于统计
+            all_dist_decays_389.append(dist_dec)
+
+        # 3. 计算 390 相互作用 (保留每个原子的得分)
         c2, n2 = get_aromatic_ring_data(r390)
-        ml_390 = [0.0, 0.0, 0.0]; d2_geo = 999.0; d2_w = 999.0
+        atom_scores_390 = np.zeros(len(lp_ring)) # [N_atoms]
+        ml_390 = [0.0, 0.0, 0.0]
         if c2 is not None:
-            d2_geo = np.linalg.norm(lc_geo - c2)
-            dists = np.linalg.norm(lp_ring - c2, axis=1)
-            angs, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c2, n2)
+            _, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c2, n2)
             _, dist_dec = calculate_distance_decay(lp_ring, c2, n2)
-            comb = calculate_combined_weight(safe_w, ang_dec, dist_dec)
-            s_sum = np.sum(comb); s_max = np.max(comb)
-            ml_390 = [s_sum, s_max, s_max/(s_sum+1e-6)]
-            d2_w = calculate_weighted_average_distance(dists, comb) if s_sum>0 else np.mean(dists)
-            all_angles_390.append(angs); all_dist_decays_390.append(dist_dec)
 
-        feat = np.concatenate([dobp, [ml_cos_angle], ml_389, ml_390])
+            # 这里直接拿到每个原子的加权分
+            atom_scores_390 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
+
+            # comb = calculate_combined_weight(safe_w, ang_dec, dist_dec)
+            s_sum = np.sum(atom_scores_390); s_max = np.max(atom_scores_390)
+            ml_390 = [s_sum, s_max, s_max/(s_sum+1e-6)]
+
+            # 用于最后画图/统计 (辅助)
+            all_angles_390.append(ang_dec)
+            all_dist_decays_390.append(dist_dec)
+
+        # C. 构建特征向量
+
+        # 当前帧的原子特征矩阵: [N_atoms, 14]
+        # 列: [Dist_1...Dist_12, Score_389, Score_390]
+        current_frame_atoms = np.column_stack([dists_obp, atom_scores_389, atom_scores_390])
+
+        # 初始化距离特征矩阵（N_ATOM_FEAT x MAX_ATOMS）
+        padded_frame = np.ones((MAX_ATOMS, N_ATOM_FEAT), dtype=np.float32) * 100.0 # 填充为大值
+        padded_frame[:, N_OBP:] = 0.0  # 得分部分填充为0
+
+        # 复制当前帧数据到填充矩阵
+        n_real = min(len(lp_ring), MAX_ATOMS)
+        padded_frame[:n_real, :] = current_frame_atoms[:n_real, :]
+
+        # 展平为一维向量
+        # 原子部分: 9 atoms x 14 features = 126
+        flat_atoms = padded_frame.flatten()  # 126维
+
+        # 全局部分：Angle (1) + 389 scores (3) + 390 scores (3) = 7
+        global_feats = np.concatenate([[ml_cos_angle], ml_389, ml_390])  # 7维
+
+        # 最终特征向量: 126 + 7 = 133维
+        feat = np.concatenate([flat_atoms, global_feats])  # 133维
         feature_vectors.append(feat)
-        
+
+        # D. 可视化对齐 & 数据记录
         p1 = c1 if c1 is not None else [0,0,0]
         p2 = c2 if c2 is not None else [0,0,0]
         tpos = [a.position for a in obp_atoms] + [p1, p2]
@@ -423,6 +442,7 @@ def process_replicate(xtc, topo, qm_data,
         _, pxy, _ = align_xy(lp_geo, np.array(tpos), lig_res.atoms.positions)
         vis_accum += pxy; cnt += 1
         
+        # E. 记录时间序列数据
         row = {
             "Time": ts.time, "Replica": rep_name, "Global_Angle": ga,
             "Phe389_Score_Sum": ml_389[0], "Phe389_Score_Max": ml_389[1],
@@ -458,7 +478,6 @@ def process_replicate(xtc, topo, qm_data,
         "Compound": cid, "Replica": rep_name, "Offset": offset,
         "Phe389_Score_Sum_Mean": df["Phe389_Score_Sum"].mean(), 
         "Phe390_Score_Sum_Mean": df["Phe390_Score_Sum"].mean()
-        #"Dist_N_to_W648_Ring_Mean": df["Dist_N_to_W648_Ring"].mean()
     }
     
     strength = None
