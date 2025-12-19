@@ -13,12 +13,12 @@ from src.model import EfficiencyPredictor
 # --- 配置参数 ---
 LABEL_FILE = "data/labels.csv"
 RESULT_DIR = "data/features"
-MODEL_PATH = "saved_models/best_model.pth"
+MODEL_PATH = "saved_models/best_model_mccv.pth"
 SCALER_PATH = "saved_models/scaler.pkl"
 
 # 物理参数 (必须与训练时一致)
 POCKET_ATOM_NUM = 12
-INPUT_DIM = 21
+INPUT_DIM = 19
 
 def load_and_predict_compound(compound_name, model, scaler, device):
     """
@@ -64,7 +64,8 @@ def load_and_predict_compound(compound_name, model, scaler, device):
                         
             # 推理
             with torch.no_grad():
-                macro_pred, _, _ = model(input_tensor)
+                out_dict = model(input_tensor) # 1. 拿到字典
+                macro_pred = out_dict["pred"]  # 2. 提取预测值
                 
             # 还原到 0-100
             preds.append(macro_pred.item() * 100)

@@ -18,13 +18,13 @@ def find_ligand(u):
     策略：排除常见溶剂/离子，选择原子数最多的残基
     """
     # 尝试按残基名称选择
-    p = u.select_atoms("resname LIG LIG1 LDP R5F DRG UNK MOL")
+    p = u.select_atoms("resname LIG LIG1 LDP R5F DRG UNK MOL 7LD")
     if len(p) > 0: 
         return p.residues[0]
     
     # 如果找不到，按排除法筛选
     cands = [r for r in u.residues if r.resname not in [
-        "TIP3", "SOL", "WAT", "SOD", "CLA", "POT", "ZN", "POPC", "POPE", "CHL", "CAL", "MG"
+        "TIP3", "SOL", "WAT", "SOD", "CLA", "POT", "ZN", "POPC", "POPE", "CHL", "CAL", "MG","LIG1"
     ] and len(r.atoms) > 3]
     
     if not cands: 

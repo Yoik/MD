@@ -24,12 +24,12 @@ SCALER_SAVE_PATH = "saved_models/scaler.pkl"
 POCKET_ATOM_NUM = 12
 INPUT_DIM = 19       # 13(Geom) + 6(Elec) + Attention
 # 训练参数
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.002
 WEIGHT_DECAY = 1e-4
-NUM_EPOCHS = 45      # 推荐 40-50
+NUM_EPOCHS = 60      # 推荐 40-50
 BATCH_SIZE = 32
 N_SPLITS = 20        # 20 轮交叉验证
-TEST_SIZE = 2        # 每次随机选 2 个化合物做测试 (Dopa 除外)
+TEST_SIZE = 1        # 每次随机选 1 个化合物做测试 (Dopa 除外)
 
 def augment_trajectory(traj, noise_std=0.01):
     """
@@ -177,8 +177,8 @@ def main():
                 # 4️⃣ 总 loss
                 loss = (
                     mse_loss
-                    + 1.0 * mean_loss
-                    + 0.01 * ent_loss
+                    + 0.5 * mean_loss
+                    + 0.001 * ent_loss
                 )
 
                 loss.backward()
@@ -296,8 +296,8 @@ def main():
     plt.ylabel("Predicted Efficacy (%)")
     plt.legend()
     
-    plt.savefig("efficacy_correlation_plot_sem_entropy_0001.png", dpi=300, bbox_inches='tight')
-    print("\nPlot saved to: efficacy_correlation_plot_sem_entropy_0001.png")
+    plt.savefig("efficacy_correlation_plot_sem_entropy.png", dpi=300, bbox_inches='tight')
+    print("\nPlot saved to: efficacy_correlation_plot_sem_entropy.png")
     
     # === 6. 全量重训并保存模型 ===
     print("\nRetraining Final Model on ALL data...")

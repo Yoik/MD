@@ -30,7 +30,7 @@ from rdkit import Chem
 # 导入模块
 try:
     # 引入模块
-    from modules.qm_loader import load_cube_and_map, save_qc_structure 
+    from modules.qm_loader import load_cube_and_map, save_qc_structure, find_ligand
     from modules.cube_parser import CubeParser
     from modules.ring_matcher import RingMatcher
     from modules.sequence_aligner import OffsetCalculator
@@ -186,13 +186,13 @@ def get_dopa_global_max(root_dir):
     print("    [WARN] Dopa reference not found! Using 1.0.")
     return 1.0
 
-def find_ligand(u):
-    p = u.select_atoms("resname LIG LIG1 LDP R5F DRG UNK")
-    if len(p)>0: return p.residues[0]
-    cands = [r for r in u.residues if r.resname not in ["TIP3","SOL","WAT","SOD","CLA","POT","ZN","POPC","POPE","CHL"] and len(r.atoms)>3]
-    if not cands: return None
-    cands.sort(key=lambda r: len(r.atoms), reverse=True)
-    return cands[0]
+#def find_ligand(u):
+#    p = u.select_atoms("resname LIG LIG1 LDP R5F DRG UNK 7LD")
+#    if len(p)>0: return p.residues[0]
+#    cands = [r for r in u.residues if r.resname not in ["TIP3","SOL","WAT","SOD","CLA","POT","ZN","POPC","POPE","CHL","CHL1"] and len(r.atoms)>3]
+#    if not cands: return None
+#    cands.sort(key=lambda r: len(r.atoms), reverse=True)
+#    return cands[0]
 
 def align_xy(lig, obp, whole):
     c = lig.mean(0); u,s,vh = np.linalg.svd(lig-c)
