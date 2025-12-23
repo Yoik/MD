@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-run_analysis_v3_robust.py
-基于 1_1_extract_cub_features.py 的 QC 流程重构
-结合 RingMatcher 精准提取环区电子特征
-【功能更新】
-1. QC_MD_MAP.pdb 仅高亮实际参与计算的环原子 (ref_ring_indices)，其他原子 B-factor 为 0。
-2. 保持 QC_REF.pdb 显示全分子积分，作为原始数据参考。
-"""
-
 import matplotlib
 matplotlib.use('Agg')
 import gc
@@ -43,29 +34,21 @@ try:
         calculate_interaction_strength,
         OutputHandler
     )
+    from src.config import init_config
 except ImportError as e:
     print(f"Error: 模块导入失败: {e}")
     sys.exit(1)
 
 # ================= 核心配置区 =================
-INTEGRATION_RADIUS = 1.5      
-OUTPUT_BASE_DIR = "./data/features"
-QC_OUTPUT_DIR = "./data/qc_structures" 
+config = init_config()
+INTEGRATION_RADIUS = config.get_float("data.integration_radius")
+OUTPUT_BASE_DIR = config.get_path("paths.result_dir")
+QC_OUTPUT_DIR = config.get_path("paths.qc_output_dir")
 
-STANDARD_SEQUENCE = """
-MDPLNLSWYDDDLERQNWSRPFNGSDGKADRPHYNYYATLLTLLIAVIVFGNVLVCMAVS
-REKALQTTTNYLIVSLAVADLLVATLVMPWVVYLEVVGEWKFSRIHCDIFVTLDVMMCTA
-SILNLCAISIDRYTAVAMPMLYNTRYSSKRRVTVMIAIVWVLSFTISCPLLFGLNNADQN
-ECIIANPAFVVYSSIVSFYVPFIVTLLVYIKIYIVLRKRRKRVNTKRSSRAFRAHLRAPL
-KGNCTHPEDMKLCTVIMKSNGSFPVNRRRVEAARRAQELEMEMLSSTSPPERTRYSPIPP
-SHHQLTLPDPSHHGLHSTPDSPAKPEKNGHAKDHPKIAKIFEIQTMPNGKTRTSLKTMSR
-RKLSQQKEKKATQMLAIVLGVFIICWLPFFITHILNIHCDCNIPPVLYSAFTWLGYVNSA
-VNPIIYTTFNIEFRKAFLKILSC
-"""
-
-PHE_RESIDUES_STD = [389, 390]
-OBP_RESIDUES_STD = [114, 115, 118, 119, 190, 193, 194, 197, 386, 389, 390, 393, 412, 416]
-PLANE_RESIDUES_STD = [198, 163, 76, 127]
+# 直接读取 BW 编号列表 (Config 中是字符串列表)
+PHE_BW_LIST = config.get_list("residues.phe_residues")     # 如 ["6.48", "6.50"]
+OBP_BW_LIST = config.get_list("residues.obp_residues")     # 如 ["3.32", ...]
+PLANE_BW_LIST = config.get_list("residues.plane_residues") # 如 ["5.46", ...]
 
 # ================= 核心工具函数：RDKit 映射 =================
 
@@ -221,12 +204,77 @@ def process_replicate(xtc, topo, qm_data,
     except Exception as e: 
         print(f"     [Error] Universe load failed for {rep_name}: {e}")
         return None, None, None
+    
+    # 【新增功能】打印偏移量 & 氨基酸单字母检查 (3.32, 6.51, 6.52)
+    # ======================================================================
+    print(f"     [Check] Residue Verification:")
+    
+    # 1. 获取当前受体的标准信息
+    # identify_receptor 会返回 (ReceptorKey, SimSeq, SimResids)
+    rec_key, _, _ = offset_calc.identify_receptor(u, verbose=True)
+    
+    if rec_key:
+        # 获取该受体的 BW 映射表 (BW -> Std ID)
+        bw_map = offset_calc.db[rec_key]['bw_map']
+        
+        # 我们要检查的目标 BW 编号
+        check_targets = ["3.32", "6.51", "6.52"]
+        
+        for bw in check_targets:
+            # A. 获取标准序列 ID (从 YAML 数据库)
+            # 注意: 如果 yaml 里没写这个 BW，就没法算 offset
+            std_id = bw_map.get(bw) 
+            if isinstance(std_id, str): std_id = int(std_id)
+            
+            # B. 获取模拟真实 ID (通过比对计算)
+            real_ids = offset_calc.get_real_residue_ids(u, [bw])
+            
+            if real_ids and std_id:
+                rid = real_ids[0] # 真实模拟 ID
+                
+                # C. 获取氨基酸单字母
+                try:
+                    # 从 Universe 中选出该残基
+                    res = u.select_atoms(f"resid {rid}").residues[0]
+                    res_name_3 = res.resname # 三字母 (如 ASP)
+                    # 复用 offset_calc 里的字典转单字母
+                    res_name_1 = offset_calc.three_to_one.get(res_name_3, '?')
+                    
+                    # D. 计算偏移量
+                    current_offset = rid - std_id
+                    
+                    # 打印结果
+                    # 格式: BW编号: Std -> Sim (Offset) | 氨基酸
+                    print(f"       - BW {bw}: Std {std_id:<3} -> Sim {rid:<3} (Offset {current_offset:+d}) | AA: {res_name_1} ({res_name_3})")
+                    
+                except Exception as e:
+                    print(f"       - BW {bw}: Sim ID {rid} found, but failed to read residue info.")
+            else:
+                status = "Not in DB" if not std_id else "Not in Sim"
+                print(f"       - BW {bw}: Check Failed ({status})")
+    else:
+        print("       - [Error] Could not identify receptor, skipping check.")
+    
+    print("-" * 50)
+    
+    # 注意：这里直接传 Universe 和 BW 列表，会自动识别受体
+    real_phe_ids = offset_calc.get_real_residue_ids(u, PHE_BW_LIST)
+    real_obp_ids = offset_calc.get_real_residue_ids(u, OBP_BW_LIST)
+    real_plane_ids = offset_calc.get_real_residue_ids(u, PLANE_BW_LIST)
 
-    offset = offset_calc.calculate_offset(u, 389)
-    if offset is None: 
-        print(f"     [Error] Sequence alignment failed (Offset is None).")
+    # 简单检查 (防止没找到残基)
+    if not real_phe_ids or not real_obp_ids:
+        print(f"     [Error] Failed to map BW residues to Simulation IDs.")
         return None, None, None
-
+        
+    # 为了兼容后面代码，计算一个名义上的 offset (仅用于统计输出，不参与核心计算)
+    # 假设 PHE_BW_LIST[0] 是 6.48 (F389)，我们看它映射到了哪
+    offset = 0 # 默认值
+    if real_phe_ids:
+        # 这里只是粗略估算，不再用于原子选择
+        offset = real_phe_ids[0] - 389
+    
+    # 找到配体
     lig_res = find_ligand(u)
     if not lig_res: 
         print(f"     [Error] Ligand not found in MD topology.")
@@ -314,6 +362,8 @@ def process_replicate(xtc, topo, qm_data,
     if not md_ring_indices or not md_geo_indices:
         print(f"     [Error] Ring atoms mapped to nowhere!")
         return None, None, None
+    
+
 
     ring_weights_np = np.array(extracted_ring_weights)
     
@@ -323,20 +373,31 @@ def process_replicate(xtc, topo, qm_data,
         print(f"            Geometry Center Atoms: {len(md_geo_indices)}")
 
     # 2. Prepare AtomGroups
-    obp_ids = [x + offset for x in OBP_RESIDUES_STD]
-    plane_ids = [x + offset for x in PLANE_RESIDUES_STD]
-    obp_atoms = u.select_atoms(f"resid {' '.join(map(str, obp_ids))} and name CA")
-    plane_res = u.select_atoms(f"resid {' '.join(map(str, plane_ids))} and name CA")
+    # obp_ids = [x + offset for x in OBP_RESIDUES_STD]
+    # plane_ids = [x + offset for x in PLANE_RESIDUES_STD]
+    obp_atoms = u.select_atoms(f"resid {' '.join(map(str, real_obp_ids))} and name CA")
+    plane_res = u.select_atoms(f"resid {' '.join(map(str, real_plane_ids))} and name CA")
+
+    # t389 = 389 + offset; t390 = 390 + offset
+    # r389 = u.select_atoms(f"resid {t389}"); r390 = u.select_atoms(f"resid {t390}")
     
-    t389 = 389 + offset; t390 = 390 + offset
-    r389 = u.select_atoms(f"resid {t389}"); r390 = u.select_atoms(f"resid {t390}")
-    
+    if len(real_phe_ids) >= 1:
+        r389 = u.select_atoms(f"resid {real_phe_ids[0]}")
+    else:
+        r389 = u.select_atoms("none") # 空选择
+        
+    if len(real_phe_ids) >= 2:
+        r390 = u.select_atoms(f"resid {real_phe_ids[1]}")
+    else:
+        r390 = u.select_atoms("none")
+
     global_ring_indices = [lig_res.atoms[i].index for i in md_ring_indices]
     ring_ag = u.atoms[global_ring_indices]
     global_geo_indices = [lig_res.atoms[i].index for i in md_geo_indices]
     geo_ag = u.atoms[global_geo_indices]
 
-    data = []; vis_accum = np.zeros((len(OBP_RESIDUES_STD)+2, 2)); cnt = 0
+    data = []; vis_accum = np.zeros((len(real_obp_ids)+2, 2)); cnt = 0
+
     feature_vectors = []
     all_angles_389 = []; all_angles_390 = []
     all_dist_decays_389 = []; all_dist_decays_390 = []
@@ -345,7 +406,7 @@ def process_replicate(xtc, topo, qm_data,
 
     # constant features defined
     MAX_ATOMS = 9
-    N_OBP = len(OBP_RESIDUES_STD) # 14 个 OBP 残基
+    N_OBP = len(OBP_BW_LIST) # 14 个 OBP 残基
     N_ATOM_FEAT = N_OBP + 2 # 每个原子的特征数 = 14 (距离) + 1 (389得分) + 1 (390得分) = 16
 
     for ts in u.trajectory:
@@ -468,7 +529,7 @@ def process_replicate(xtc, topo, qm_data,
         pdb_path = str(proj_path).replace('.png', '_structure.pdb')
         save_3d_structure_pdb(
             lig_res.atoms.positions, [a.name for a in lig_res.atoms],
-            obp_atoms.positions, [f"RES{i}" for i in range(len(obp_ids))], obp_ids,
+            obp_atoms.positions, [f"RES{i}" for i in range(len(real_obp_ids))], real_obp_ids,
             pdb_path, cid,
             ring_atom_indices=md_ring_indices, 
             ring_weights=extracted_ring_weights
@@ -495,7 +556,7 @@ def main():
     root = "."
     if not os.path.exists(OUTPUT_BASE_DIR): os.makedirs(OUTPUT_BASE_DIR)
     GLOBAL_MAX = get_dopa_global_max(root)
-    aligner = OffsetCalculator(STANDARD_SEQUENCE)
+    aligner = OffsetCalculator()
     all_dirs = glob.glob(os.path.join(root, "*"))
     all_dirs.sort(key=lambda x: (not "dopa" in os.path.basename(x).lower(), x))
     
@@ -539,23 +600,37 @@ def main():
         ts_list = []; stat_list = []
         
         for xtc in xtcs:
-            rd = os.path.dirname(xtc); rn = os.path.basename(rd)
+            rd = os.path.dirname(xtc) # 例如 .../charmm-gui-6321/gromacs_replicate_1
+            
+            # 1. 获取基础 replicate 名 (gromacs_replicate_1)
+            base_rn = os.path.basename(rd) 
+            
+            # 2. 获取上一级 charmm-gui 名 (charmm-gui-6321...)
+            charmm_gui_id = os.path.basename(os.path.dirname(rd))
+            
+            # 3. 组合成唯一名称！
+            # 结果示例: "charmm-gui-6321_gromacs_replicate_1"
+            # 这样输出文件夹就会变成 data/features/Dopa/charmm-gui-6321_gromacs_replicate_1/
+            unique_rn = f"{charmm_gui_id}_{base_rn}"
+            
             tps = [os.path.join(rd, f) for f in os.listdir(rd) if f.endswith(".tpr")]
             topo = next((t for t in tps if "production" in t), tps[0] if tps else None)
             
             if topo:
-                output_handler = OutputHandler(cid, rn, OUTPUT_BASE_DIR)
+                # 使用 unique_rn 初始化 OutputHandler
+                output_handler = OutputHandler(cid, unique_rn, OUTPUT_BASE_DIR)
+                
                 ts, st, strength = process_replicate(
                     xtc, topo, qm_data, 
                     ref_ring_indices, ref_geo_indices, ring_type,
-                    cid, rn, aligner, output_handler, GLOBAL_MAX
+                    cid, unique_rn, aligner, output_handler, GLOBAL_MAX
                 )
                 if ts is not None:
                     output_handler.save_timeseries(ts)
                     output_handler.save_stats(pd.DataFrame([st]))
                     ts_list.append(ts); stat_list.append(st)
             else:
-                print(f"  [Skip] No suitable .tpr found in {rn}")
+                print(f"  [Skip] No suitable .tpr found in {base_rn}")
 
             gc.collect()
             

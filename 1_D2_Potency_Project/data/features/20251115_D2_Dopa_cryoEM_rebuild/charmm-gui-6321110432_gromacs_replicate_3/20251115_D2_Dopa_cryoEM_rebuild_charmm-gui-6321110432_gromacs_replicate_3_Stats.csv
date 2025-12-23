@@ -1,0 +1,2 @@
+Compound,Replica,Offset,Phe389_Score_Sum_Mean,Phe390_Score_Sum_Mean,strength_389,strength_390,strength_combined,quality_score_389,quality_score_390,major_contributor_389,major_contributor_390,avg_angle_389,avg_angle_390,std_angle_389,std_angle_390
+20251115_D2_Dopa_cryoEM_rebuild,charmm-gui-6321110432_gromacs_replicate_3,-35,2.232425441291454,1.6767534816755763,6.025328580333319e-05,4.8320386198296316e-05,5.428683600081475e-05,6.823864640781424e-05,7.559559023119321e-05,1,3,0.8016398541120413,0.684771793038509,0.06993786832845829,0.1996643245193013

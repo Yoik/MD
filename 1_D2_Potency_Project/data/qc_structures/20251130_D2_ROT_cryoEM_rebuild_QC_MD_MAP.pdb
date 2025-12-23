@@ -1,0 +1,99 @@
+TITLE     MDANALYSIS FRAME 0: Created by PDBWriter
+CRYST1  119.386  119.386  151.804  90.00  90.00  90.00 P 1           1
+ATOM      1  C1  R5F X1036      62.240  60.320  74.570  1.00  0.00      seg_ C  
+ATOM      2  N   R5F X1036      58.840  60.040  72.530  1.00  0.00      seg_ N  
+ATOM      3  O   R5F X1036      54.090  64.420  73.620  1.00  0.00      seg_ O  
+ATOM      4  S   R5F X1036      60.910  57.680  68.040  1.00  0.00      seg_ S  
+ATOM      5  C2  R5F X1036      61.110  60.860  73.670  1.00  0.00      seg_ C  
+ATOM      6  C3  R5F X1036      60.110  59.640  73.370  1.00  0.00      seg_ C  
+ATOM      7  C4  R5F X1036      59.260  60.210  71.080  1.00  0.00      seg_ C  
+ATOM      8  C5  R5F X1036      59.920  58.950  70.440  1.00  0.00      seg_ C  
+ATOM      9  C6  R5F X1036      60.350  59.020  68.940  1.00  0.00      seg_ C  
+ATOM     10  C7  R5F X1036      60.480  60.140  68.150  1.00  0.00      seg_ C  
+ATOM     11  C8  R5F X1036      61.130  59.970  66.960  1.00  0.00      seg_ C  
+ATOM     12  C9  R5F X1036      61.520  58.700  66.830  1.00  0.00      seg_ C  
+ATOM     13  C10 R5F X1036      57.900  61.150  73.070  1.00  0.00      seg_ C  
+ATOM     14  C11 R5F X1036      56.600  61.290  72.320  1.00  0.00      seg_ C  
+ATOM     15  C12 R5F X1036      55.950  62.610  72.650  1.00  0.00      seg_ C  
+ATOM     16  C13 R5F X1036      55.790  62.760  74.140  1.00  0.86      seg_ C  
+ATOM     17  C14 R5F X1036      56.570  62.060  75.080  1.00  0.69      seg_ C  
+ATOM     18  C15 R5F X1036      57.610  61.090  74.630  1.00  0.00      seg_ C  
+ATOM     19  C16 R5F X1036      56.220  62.180  76.410  1.00  0.76      seg_ C  
+ATOM     20  C17 R5F X1036      55.230  63.100  76.840  1.00  0.70      seg_ C  
+ATOM     21  C18 R5F X1036      54.520  63.860  75.910  1.00  0.91      seg_ C  
+ATOM     22  C19 R5F X1036      54.830  63.730  74.600  1.00  0.78      seg_ C  
+ATOM     23  H1  R5F X1036      62.720  59.490  74.000  1.00  0.00      seg_ H  
+ATOM     24  H2  R5F X1036      62.000  60.020  75.610  1.00  0.00      seg_ H  
+ATOM     25  H3  R5F X1036      62.990  61.130  74.740  1.00  0.00      seg_ H  
+ATOM     26  H4  R5F X1036      58.230  59.200  72.420  1.00  0.00      seg_ H  
+ATOM     27  H5  R5F X1036      53.320  64.750  74.080  1.00  0.00      seg_ H  
+ATOM     28  H6  R5F X1036      61.540  61.170  72.690  1.00  0.00      seg_ H  
+ATOM     29  H7  R5F X1036      60.680  61.690  74.260  1.00  0.00      seg_ H  
+ATOM     30  H8  R5F X1036      60.640  58.820  72.850  1.00  0.00      seg_ H  
+ATOM     31  H9  R5F X1036      59.720  59.160  74.280  1.00  0.00      seg_ H  
+ATOM     32  H10 R5F X1036      59.930  61.080  71.040  1.00  0.00      seg_ H  
+ATOM     33  H11 R5F X1036      58.390  60.450  70.460  1.00  0.00      seg_ H  
+ATOM     34  H12 R5F X1036      59.120  58.190  70.430  1.00  0.00      seg_ H  
+ATOM     35  H13 R5F X1036      60.770  58.430  70.940  1.00  0.00      seg_ H  
+ATOM     36  H14 R5F X1036      60.120  61.050  68.590  1.00  0.00      seg_ H  
+ATOM     37  H15 R5F X1036      61.450  60.800  66.350  1.00  0.00      seg_ H  
+ATOM     38  H16 R5F X1036      62.070  58.240  66.020  1.00  0.00      seg_ H  
+ATOM     39  H17 R5F X1036      58.410  62.120  72.870  1.00  0.00      seg_ H  
+ATOM     40  H18 R5F X1036      55.990  60.380  72.530  1.00  0.00      seg_ H  
+ATOM     41  H19 R5F X1036      56.650  61.280  71.210  1.00  0.00      seg_ H  
+ATOM     42  H20 R5F X1036      54.990  62.740  72.120  1.00  0.00      seg_ H  
+ATOM     43  H21 R5F X1036      56.640  63.410  72.290  1.00  0.00      seg_ H  
+ATOM     44  H22 R5F X1036      58.580  61.400  75.080  1.00  0.00      seg_ H  
+ATOM     45  H23 R5F X1036      57.200  60.090  74.900  1.00  0.00      seg_ H  
+ATOM     46  H24 R5F X1036      56.850  61.700  77.140  1.00  0.00      seg_ H  
+ATOM     47  H25 R5F X1036      55.060  63.120  77.910  1.00  0.00      seg_ H  
+ATOM     48  H26 R5F X1036      53.680  64.450  76.240  1.00  0.00      seg_ H  
+CONECT    1    5   23   24   25
+CONECT    2    6    7   13   26
+CONECT    3   22   27
+CONECT    4    9   12
+CONECT    5    1    6   28   29
+CONECT    6    2    5   30   31
+CONECT    7    2    8   32   33
+CONECT    8    7    9   34   35
+CONECT    9    4    8   10
+CONECT   10    9   11   36
+CONECT   11   10   12   37
+CONECT   12    4   11   38
+CONECT   13    2   14   18   39
+CONECT   14   13   15   40   41
+CONECT   15   14   16   42   43
+CONECT   16   15   17   22
+CONECT   17   16   18   19
+CONECT   18   13   17   44   45
+CONECT   19   17   20   46
+CONECT   20   19   21   47
+CONECT   21   20   22   48
+CONECT   22    3   16   21
+CONECT   23    1
+CONECT   24    1
+CONECT   25    1
+CONECT   26    2
+CONECT   27    3
+CONECT   28    5
+CONECT   29    5
+CONECT   30    6
+CONECT   31    6
+CONECT   32    7
+CONECT   33    7
+CONECT   34    8
+CONECT   35    8
+CONECT   36   10
+CONECT   37   11
+CONECT   38   12
+CONECT   39   13
+CONECT   40   14
+CONECT   41   14
+CONECT   42   15
+CONECT   43   15
+CONECT   44   18
+CONECT   45   18
+CONECT   46   19
+CONECT   47   20
+CONECT   48   21
+END

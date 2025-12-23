@@ -62,6 +62,11 @@ class EfficiencyPredictor(nn.Module):
 
         # 最终输入维度 = 原子集合编码(144) + 全局特征(7) = 151维
         self.frame_dim = self.ring_dim + self.global_feat_dim
+
+        # === 【核心修改】动态特征掩码 (Dynamic Feature Mask) ===
+        # 初始化为 0.5 (sigmoid(0) = 0.5)，表示“不确定是否有用”
+        # 模型会自己学习把它推向 1 (有用) 或 0 (无用)
+        self.feature_mask_logits = nn.Parameter(torch.ones(input_dim) * 2.0)
         
         # === 1. 原子集合编码器 ===
         self.atom_encoder = AtomSetEncoder(self.atom_feat_dim, self.atom_hidden_dim)
@@ -74,7 +79,7 @@ class EfficiencyPredictor(nn.Module):
             nn.Linear(64, 32),
             nn.ReLU(),
             nn.Linear(32, 1),
-            nn.Sigmoid()  # 输出范围 [0, 1]
+            #nn.Sigmoid()  # 输出范围 [0, 1]
         )
 
         # === 3. 时间注意力 模块 ===
@@ -86,13 +91,20 @@ class EfficiencyPredictor(nn.Module):
         )
 
     def forward(self, x):
-        # x shape: [Batch, Frames, 133]
-        batch_size, num_frames, _ = x.shape
+        # x shape: [Batch, Frames, 151]
+
+        # === 【核心修改】应用动态掩码 ===
+        # 生成 0-1 的门控值
+        mask = torch.sigmoid(self.feature_mask_logits)
+        # 广播应用: [151] -> [1, 1, 151]
+        x_masked = x * mask.view(1, 1, -1)
+
+        batch_size, num_frames, _ = x_masked.shape
         
         # --- A. 拆分特征 ---
         # 1. 拆分特征
-        x_atoms_flat = x[:, :, :self.n_atoms * self.atom_feat_dim]
-        x_global = x[:, :, self.n_atoms * self.atom_feat_dim:]
+        x_atoms_flat = x_masked[:, :, :self.n_atoms * self.atom_feat_dim]
+        x_global = x_masked[:, :, self.n_atoms * self.atom_feat_dim:]
         
         # 2. 重塑原子特征形状: [B, F, 9, 14]
         x_atoms = x_atoms_flat.view(batch_size, num_frames, self.n_atoms, self.atom_feat_dim)
@@ -124,6 +136,6 @@ class EfficiencyPredictor(nn.Module):
         return {
             "pred": macro_pred,           # 对应 out["pred"]
             "frame_scores": frame_scores, # 对应 out["frame_scores"]
-            "gate": frame_scores,         # 对应 out["gate"] (在DeepSets架构中，gate已融入frame_scores)
-            "attn": attn_weights          # 对应 out["attn"]
+            "attn": attn_weights,          # 对应 out["attn"]
+            "mask": mask
         }

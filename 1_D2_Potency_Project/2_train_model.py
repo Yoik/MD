@@ -1,261 +1,192 @@
 import sys
 import os
 import matplotlib
-matplotlib.use('Agg')  # <--- 【关键修改1】防止在服务器上画图崩溃
-
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
-from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import LeaveOneOut 
+from scipy import stats 
 from src.dataset import prepare_data, TrajectoryDataset
 from src.model import EfficiencyPredictor
+from src.config import init_config
 
-# ==============================================================================
-# 配置参数
-# ==============================================================================
-LABEL_FILE = "data/labels.csv"
-RESULT_DIR = "data/features"
-MODEL_SAVE_PATH = "saved_models/best_model_mccv.pth" 
-SCALER_SAVE_PATH = "saved_models/scaler.pkl"
+# ================= 配置参数 =================
+config = init_config()
 
-# 物理参数
-POCKET_ATOM_NUM = 12
-INPUT_DIM = 151       # 13(Geom) + 6(Elec) + Attention
-# 训练参数
-LEARNING_RATE = 0.002
-DROPOUT_RATE = 0.2 # 注意力和全连接层的 dropout 比例
-WEIGHT_DECAY = 1e-4
-NUM_EPOCHS = 60      # 推荐 40-50
-BATCH_SIZE = 32
-N_SPLITS = 20        # 20 轮交叉验证
-TEST_SIZE = 1        # 每次随机选 1 个化合物做测试 (Dopa 除外)
+LABEL_FILE = config.get_path("paths.label_file") #··标签文件路径
+RESULT_DIR = config.get_path("paths.result_dir") #··结果输出目录
+MODEL_SAVE_PATH = config.get_path("paths.model_path") #··模型保存路径
+SCALER_SAVE_PATH = config.get_path("paths.scaler_path") #··标准化器保存路径
 
-def augment_trajectory(traj, noise_std=0.01):
-    """
-    traj: [B, T, F]
-    """
-    noise = torch.randn_like(traj) * noise_std
-    return traj + noise
+POCKET_ATOM_NUM = config.get_int("data.pocket_atom_num") #··口袋原子数量
+INPUT_DIM = config.get_int("data.input_dim_features") #··输入特征维度
+LEARNING_RATE = config.get_float("training.learning_rate") #··学习率
+DROPOUT_RATE = config.get_float("training.dropout_rate") #··Dropout 比例
+WEIGHT_DECAY = config.get_float("training.weight_decay") #··权重衰减
+NUM_EPOCHS = config.get_int("training.num_epochs") #··训练轮数 
+BATCH_SIZE = config.get_int("training.batch_size") #··批量大小
 
-def attention_entropy(attn_weights, eps=1e-8):
-    """
-    attn_weights: [B, T, 1]
-    """
-    p = attn_weights.squeeze(-1)
-    entropy = -torch.sum(p * torch.log(p + eps), dim=1)
-    return entropy.mean()
+# 【新增】稀疏惩罚系数
+# 值越大，模型删特征越狠；值越小，模型保留特征越多
+# 建议 0.001 - 0.005
+L1_LAMBDA = config.get_float("training.l1_lambda") #··L1 稀疏惩罚系数
 
-# ==============================================================================
-# 主程序
-# ==============================================================================
 def main():
-    # 1. 准备数据
-    print("Preparing data with slicing...")
+    print("Preparing data...")
     try:
         train_ds, test_ds = prepare_data(
             label_file=LABEL_FILE, 
             result_dir=RESULT_DIR, 
             pocket_atom_num=POCKET_ATOM_NUM, 
             save_scaler_path=SCALER_SAVE_PATH,
-            window_size=100, 
-            stride=20
+            window_size=100, stride=20
         )
     except Exception as e:
-        print(f"\n[DATA ERROR] Failed to load data: {e}")
-        import traceback
-        traceback.print_exc()
-        return
+        print(f"[DATA ERROR] {e}"); return
 
-    # 2. 整合全量数据 (用于自定义划分)
-    full_features = train_ds.features + test_ds.features
-    full_labels = train_ds.labels + test_ds.labels
-    full_ids = train_ds.ids + test_ds.ids
-    full_dataset = TrajectoryDataset(full_features, full_labels, full_ids)
+    # 1. 创建 Full Dataset
+    full_dataset = TrajectoryDataset(
+        train_ds.features + test_ds.features,
+        train_ds.labels + test_ds.labels,
+        train_ds.ids + test_ds.ids
+    )
     
-    # 获取所有唯一的化合物 ID
-    all_ids = full_dataset.ids
-    unique_compounds = sorted(list(set(all_ids)))
-
-    compound2idx = {name: i for i, name in enumerate(unique_compounds)}
-    num_compounds = len(unique_compounds)
-    print(f"Compound embedding vocab size: {num_compounds}")
-
+    unique_compounds = sorted(list(set(full_dataset.ids)))
+    print(f"Total Compounds: {len(unique_compounds)}")
     
-    # 多个 reference
-    ref_compounds = ["Dopa", "ARI"]
+    # ================= 2. 药效团特征滤镜 (Hard Constraints) =================
+    # 我们依然保留 Hard Mask，用来强制屏蔽 Y416/V114 等作弊特征
+    # 但对于其他区域，我们全部设为 1，让 Dynamic Mask 自己去筛选
+    
+    print("\n[STRATEGY] Hybrid Masking Strategy")
+    print("1. Hard Mask: Strictly ban Y416 & V114 (Cheating Features)")
+    print("2. Dynamic Mask: Let model learn importance for everything else")
+    
+    hard_mask = np.ones(INPUT_DIM, dtype=np.float32)
+    n_atoms = 9
+    
+    # 禁止的残基索引: 0(V114), 13(Y416)
+    # 我们只屏蔽这两个，其他的全开，看模型自己选谁
+    banned_indices = [0, 13] 
+    
+    for i in range(n_atoms):
+        base = i * 16
+        for idx in banned_indices:
+            hard_mask[base + idx] = 0.0
+            
+    # 转为 Tensor
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    hard_mask_t = torch.from_numpy(hard_mask).float().to(device)
+    hard_mask_t = hard_mask_t.unsqueeze(0).unsqueeze(0) # [1, 1, 151]
+    
+    print(f"Hard Mask initialized. Banned features set to 0.")
+    # ======================================================================
 
+    ref_compounds = ["Dopa","UNC","BRE","ARI"]
     always_train_cmpds = [c for c in ref_compounds if c in unique_compounds]
     candidates = [c for c in unique_compounds if c not in always_train_cmpds]
 
-    if not always_train_cmpds:
-        print("[Warning] No reference compounds found in dataset!")
-
-    print(f"\n>>> Dataset Ready.")
-    print(f"Total Slices: {len(full_dataset)}")
-    print(f"Total Compounds: {len(unique_compounds)}")
-    print(f"Splittable Candidates: {len(candidates)} (Dopa and ARI excluded from test)")
-    print("-" * 50)
-    print(f"Starting MCCV ({N_SPLITS} rounds)...")
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Device: {device}")
-    
-    # === [关键修复]：初始化分割器和结果容器 ===
-    # 定义随机分割器
-    rs = ShuffleSplit(n_splits=N_SPLITS, test_size=TEST_SIZE, random_state=42)
-    
-    # 初始化结果列表 (替代原来的 compound_results 字典)
+    rs = LeaveOneOut()
     loocv_results = []
 
-    # === 4. 开始 MCCV 循环 ===
-    # 注意：这里是对 candidates 进行分割，而不是 unique_compounds
+    print(f"Starting LOO-CV with Dynamic Masking...")
+
     for round_idx, (train_idx_cand, test_idx_cand) in enumerate(rs.split(candidates)):
         
-        # 4.1 构建本轮的化合物名单
-        # 从索引映射回名字
-        train_cand_names = [candidates[i] for i in train_idx_cand]
-        test_cmpds = [candidates[i] for i in test_idx_cand]
+        test_cmpd_name = candidates[test_idx_cand[0]]
+        train_cmpds = [candidates[i] for i in train_idx_cand] + always_train_cmpds
         
-        # 训练集 = 被选中的候选者 + Dopa
-        train_cmpds = train_cand_names + always_train_cmpds
-        
-        print(f"\n--- Round {round_idx+1}/{N_SPLITS} ---")
-        # print(f"  Train: {len(train_cmpds)} compounds")
-        # print(f"  Test : {test_cmpds}")
-
-        # 根据 ID 找切片索引
         train_indices = [i for i, x in enumerate(full_dataset.ids) if x in train_cmpds]
-        test_indices = [i for i, x in enumerate(full_dataset.ids) if x in test_cmpds]
+        test_indices = [i for i, x in enumerate(full_dataset.ids) if x == test_cmpd_name]
         
-        # 构建 DataLoader
+        if not test_indices: continue
+
+        # Z-Score
+        train_labels_raw = [full_dataset.labels[i] for i in train_indices]
+        y_mean = np.mean(train_labels_raw)
+        y_std = np.std(train_labels_raw) + 1e-6 
+        
+        y_mean_t = torch.tensor(y_mean, device=device, dtype=torch.float)
+        y_std_t = torch.tensor(y_std, device=device, dtype=torch.float)
+        
         train_loader = DataLoader(Subset(full_dataset, train_indices), batch_size=BATCH_SIZE, shuffle=True)
-        # 注意：test_loader 这里其实不需要了，因为下面是按化合物单独测试的，但保留也没事
         
-        # 初始化模型
         model = EfficiencyPredictor(input_dim=INPUT_DIM, dropout_rate=DROPOUT_RATE).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
-        criterion = nn.MSELoss()
+        criterion = nn.MSELoss() 
 
-        # 4.2 训练 (Train)
         model.train()
         for epoch in range(NUM_EPOCHS):
-            for traj, label, cmpd_name in train_loader:
+            for traj, label, _ in train_loader:
                 traj, label = traj.to(device), label.to(device)
-
-                traj = augment_trajectory(traj, noise_std=0.01)
+                
+                # 【应用 Hard Mask】(先屏蔽作弊的)
+                traj = traj * hard_mask_t 
+                # 注意：Dynamic Mask 是在 model.forward 内部应用的
+                
+                target_z = (label - y_mean_t) / y_std_t
 
                 optimizer.zero_grad()
                 out = model(traj)
-
-                pred = out["pred"]
-                frame_scores = out["frame_scores"]
-                gate_val = out["gate"]
-                attn_weights = out["attn"]
-
-                # 1️⃣ 原有 macro-level loss
-                mse_loss = criterion(pred.squeeze(), label.squeeze())
-
-                # 2️⃣ 新增：轨迹均值约束
-                frame_mean = frame_scores.mean(dim=1).squeeze(-1)
-                mean_loss = criterion(frame_mean, label.squeeze())
-
-                # 3️⃣ 注意力熵正则
-                # attn_weights: [B, T, 1]
-                T = attn_weights.shape[1]
-
-                H_max = torch.log(torch.tensor(T, device=attn_weights.device, dtype=torch.float))
-                H_target = 0.6 * H_max   # 经验值：0.5~0.7 都可以
-
-                H = attention_entropy(attn_weights)
-
-                ent_loss = (H - H_target).pow(2)
-
-                # 4️⃣ 总 loss
-                loss = (
-                    mse_loss
-                    + 0.5 * mean_loss
-                    + 0.001 * ent_loss
-                )
-
+                pred_z = out["pred"].squeeze()
+                learned_mask = out["mask"] # 获取当前学到的 mask
+                
+                # 1. 预测误差
+                mse_loss = criterion(pred_z, target_z.squeeze())
+                
+                # 2. 【核心】L1 稀疏惩罚 (逼迫模型关掉不用的特征)
+                # 加上一个小权重的 L1 Loss
+                l1_loss = torch.mean(learned_mask) 
+                
+                loss = mse_loss + L1_LAMBDA * l1_loss
+                
                 loss.backward()
                 optimizer.step()
-                if epoch == 0:
-                    print(
-                        "pred mean:", pred.mean().item(),
-                        "frame mean:", frame_mean.mean().item(),
-                        "label mean:", label.mean().item()
-                    )
 
-        # 4.3 测试 (Test) - 按化合物逐个评估
+        # 测试
         model.eval()
+        slice_preds_real = []
+        ground_truth = None
+        
+        test_loader = DataLoader(Subset(full_dataset, test_indices), batch_size=BATCH_SIZE, shuffle=False)
+        
         with torch.no_grad():
-            for cmpd_name in test_cmpds:
-                # 找出该化合物对应的所有切片索引
-                cmpd_indices = [i for i, x in enumerate(full_dataset.ids) if x == cmpd_name]
-                if len(cmpd_indices) == 0: continue
+            for traj, label, _ in test_loader:
+                traj = traj.to(device)
+                traj = traj * hard_mask_t # Hard mask
                 
-                # 专属 Loader
-                cmpd_subset = Subset(full_dataset, cmpd_indices)
-                cmpd_loader = DataLoader(cmpd_subset, batch_size=BATCH_SIZE, shuffle=False)
+                out = model(traj)
+                pred_z = out["pred"].detach().cpu().numpy().flatten()
                 
-                slice_preds = []
-                ground_truth = None
-                
-                for traj, label, cmpd_name_batch in cmpd_loader:
-                    traj = traj.to(device)
-                    out = model(traj)
-                    pred = out["pred"]
+                pred_real = (pred_z * y_std + y_mean) * 100
+                slice_preds_real.extend(pred_real)
+                if ground_truth is None: ground_truth = label[0].item() * 100
 
-                    slice_preds.extend(
-                        pred.detach().cpu().numpy().flatten()
-                    )
-                    if ground_truth is None and len(label) > 0:
-                        ground_truth = label[0].item()
-                
-                if len(slice_preds) > 0:
-                    avg_pred = np.mean(slice_preds)
-                    true_val_100 = ground_truth * 100
-                    pred_val_100 = avg_pred * 100
-                    diff = pred_val_100 - true_val_100
-                    
-                    loocv_results.append({
-                        "Compound": cmpd_name,
-                        "True": true_val_100,
-                        "Pred": pred_val_100,
-                        "Diff": diff,
-                        "Round": round_idx
-                    })
+        if slice_preds_real:
+            avg_pred = np.mean(slice_preds_real)
+            avg_pred = np.clip(avg_pred, 0, 120)
+            diff = avg_pred - ground_truth
+            
+            loocv_results.append({
+                "Compound": test_cmpd_name,
+                "True": ground_truth,
+                "Pred": avg_pred,
+                "Diff": diff
+            })
 
-    # ==========================================
-    # 5. 汇总报告与可视化
-    # ==========================================
+    # ================= 报告 =================
     print("\n" + "="*50)
-    print("MCCV Final Report")
+    print("LOO-CV Final Report (Dynamic Masking)")
     print("="*50)
     
-    # 转换为 DataFrame
     df_res = pd.DataFrame(loocv_results)
-    
-    if df_res.empty:
-        print("Error: No results generated.")
-        return
+    if df_res.empty: return
 
-    # 计算整体指标
-    rmse = np.sqrt(np.mean((df_res['True'] - df_res['Pred'])**2))
-    corr = df_res['True'].corr(df_res['Pred'])
-    print(f"Overall RMSE : {rmse:.4f}")
-    print(f"Pearson R    : {corr:.4f}")
-
-    # === 绘图部分 (Mean ± SEM) ===
-    import matplotlib.pyplot as plt
-    import seaborn as sns
-    from scipy import stats
-
-    print("\nGenerating Correlation Plot with Error Bars...")
-    
-    # 聚合计算 Mean 和 SEM
     summary = df_res.groupby('Compound').agg({
         'Pred': ['mean', 'sem', 'count'],
         'True': 'first'
@@ -265,9 +196,11 @@ def main():
     print("\n--- Compound Performance Summary ---")
     print(summary[['Compound', 'True_Val', 'Pred_Mean', 'Pred_SEM', 'Count']].to_string(index=False))
 
-    # 计算聚合后的 R 和 RMSE
     r_pearson, p_value = stats.pearsonr(summary['True_Val'], summary['Pred_Mean'])
     rmse_agg = np.sqrt(np.mean((summary['True_Val'] - summary['Pred_Mean'])**2))
+    
+    print(f"\nAggregated Pearson R : {r_pearson:.4f}")
+    print(f"Aggregated RMSE      : {rmse_agg:.4f}")
 
     # 绘图
     plt.figure(figsize=(10, 8))
@@ -289,56 +222,93 @@ def main():
     for i, row in summary.iterrows():
         plt.text(row['True_Val']+1, row['Pred_Mean']+1, row['Compound'], fontsize=9, alpha=0.7)
         
-    plt.title(f"MCCV Prediction ({N_SPLITS} rounds)\nPearson R = {r_pearson:.3f} | RMSE = {rmse_agg:.3f}")
+    plt.title(f"Loo Prediction \nPearson R = {r_pearson:.3f} | RMSE = {rmse_agg:.3f}")
     plt.xlabel("Experimental Efficacy (%)")
     plt.ylabel("Predicted Efficacy (%)")
     plt.legend()
     
     plt.savefig("efficacy_correlation_plot_sem_entropy.png", dpi=300, bbox_inches='tight')
     print("\nPlot saved to: efficacy_correlation_plot_sem_entropy.png")
+
+    # ================= 查看模型到底选了谁 =================
+    print("\nRetraining on ALL data to inspect learned mask...")
+    final_loader = DataLoader(full_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    final_model = EfficiencyPredictor(input_dim=INPUT_DIM, dropout_rate=DROPOUT_RATE).to(device)
+    optimizer = torch.optim.Adam(final_model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     
-    # === 6. 全量重训并保存模型 ===
-    print("\nRetraining Final Model on ALL data...")
-
-    final_loader = DataLoader(
-        full_dataset,
-        batch_size=BATCH_SIZE,
-        shuffle=True
-    )
-
-    final_model = EfficiencyPredictor(
-        input_dim=INPUT_DIM,
-        dropout_rate=DROPOUT_RATE
-    ).to(device)
-
-    optimizer = torch.optim.Adam(
-        final_model.parameters(),
-        lr=LEARNING_RATE,
-        weight_decay=WEIGHT_DECAY
-    )
-
-    criterion = nn.MSELoss()
+    all_labels = [l for l in full_dataset.labels]
+    final_mean = np.mean(all_labels)
+    final_std = np.std(all_labels)
+    y_mean_t = torch.tensor(final_mean, device=device, dtype=torch.float)
+    y_std_t = torch.tensor(final_std, device=device, dtype=torch.float)
 
     final_model.train()
     for epoch in range(NUM_EPOCHS):
-        for traj, label, cmpd_name in final_loader:
-            traj = traj.to(device)
-            label = label.to(device)
-
+        for traj, label, _ in final_loader:
+            traj, label = traj.to(device), label.to(device)
+            traj = traj * hard_mask_t
+            target_z = (label - y_mean_t) / y_std_t
+            
             optimizer.zero_grad()
-
-            # ✅ 正确接收 dict 输出
             out = final_model(traj)
-            pred = out["pred"]
-
-            loss = criterion(pred.squeeze(), label.squeeze())
+            loss = nn.MSELoss()(out["pred"].squeeze(), target_z.squeeze()) + L1_LAMBDA * torch.mean(out["mask"])
             loss.backward()
             optimizer.step()
+            
+    # 打印学到的 Mask
+    final_mask = torch.sigmoid(final_model.feature_mask_logits).detach().cpu().numpy()
+    
+    # 1. 直接读取 BW 编号作为标签
+    OBP_LABELS = config.get_list("residues.obp_residues")
+    PHE_LABELS = config.get_list("residues.phe_residues")
+
+    print(f"Loaded {len(OBP_LABELS)} OBP labels from config: {OBP_LABELS}")
+
+    # === 动态生成 151 维特征名称 ===
+    FEATURE_NAMES = []
+
+    # A. 原子特征 (0-143): 9个原子 * (N个距离 + 2个电子)
+    for i in range(9):
+        # 1. 距离特征 (BW 编号)
+        for bw_label in OBP_LABELS:
+            FEATURE_NAMES.append(f"Atom{i}_{bw_label}_Dist") # 例如 Atom0_3.32_Dist
+        
+        # 2. 电子特征 (Phe 389/390 -> 6.48/6.51)
+        if len(PHE_LABELS) >= 1:
+            FEATURE_NAMES.append(f"Atom{i}_{PHE_LABELS[0]}_Score")
+        if len(PHE_LABELS) >= 2:
+            FEATURE_NAMES.append(f"Atom{i}_{PHE_LABELS[1]}_Score")
+
+    # 1. 全局角度 (1维)
+    FEATURE_NAMES.append("Global_Cos_Angle")
+    
+    # 2. Phe1 全局统计 (3维: Sum, Max, Norm)
+    p1 = PHE_LABELS[0] if len(PHE_LABELS) > 0 else "Phe1"
+    FEATURE_NAMES.extend([f"{p1}_Global_Sum", f"{p1}_Global_Max", f"{p1}_Global_Norm"])
+    
+    # 3. Phe2 全局统计 (3维: Sum, Max, Norm)
+    p2 = PHE_LABELS[1] if len(PHE_LABELS) > 1 else "Phe2"
+    FEATURE_NAMES.extend([f"{p2}_Global_Sum", f"{p2}_Global_Max", f"{p2}_Global_Norm"])
+    # ==========================================================
+
+    # 简单检查一下维度是否对齐
+    if len(FEATURE_NAMES) != len(final_mask):
+        print(f"[Warning] Name mismatch! Names: {len(FEATURE_NAMES)}, Mask: {len(final_mask)}")
+        # 防止再次报错，补齐 Unknown
+        while len(FEATURE_NAMES) < len(final_mask):
+            FEATURE_NAMES.append(f"Unknown_Feat_{len(FEATURE_NAMES)}")
+            print(f"Added placeholder feature: {FEATURE_NAMES[-1]}")
+    # 排序并打印 Top 15
+    indices = np.argsort(final_mask)[::-1]
+    print("\n>>> Top 15 Features Chosen by Dynamic Mask:")
+    print(f"{'Rank':<5} | {'Feature':<20} | {'Mask Value':<10}")
+    print("-" * 45)
+    for i in range(15):
+        idx = indices[i]
+        print(f"{i+1:<5} | {FEATURE_NAMES[idx]:<20} | {final_mask[idx]:.4f}")
 
     torch.save(final_model.state_dict(), MODEL_SAVE_PATH)
-    print(f"Final model saved to: {MODEL_SAVE_PATH}")
-    print("Done.")
+    print("\nModel saved.")
 
-# 别忘了调用 main
 if __name__ == "__main__":
     main()
