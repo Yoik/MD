@@ -195,6 +195,21 @@ def save_3d_structure_pdb(lig_coords, lig_names, obp_coords, obp_names, obp_indi
     except Exception as e:
         print(f"Error saving PDB: {e}")
 
+def calculate_principal_axis(positions, weights):
+    """ 计算加权点云的第一主轴 (PCA) """
+    weights = weights.reshape(-1, 1)
+    total_weight = np.sum(weights)
+    if total_weight < 1e-6: return None
+    center = np.sum(positions * weights, axis=0) / total_weight
+    centered_pos = positions - center
+    weighted_pos = centered_pos * np.sqrt(weights)
+    covariance_matrix = np.dot(weighted_pos.T, weighted_pos)
+    try:
+        eigvals, eigvecs = np.linalg.eigh(covariance_matrix)
+        return eigvecs[:, -1] # 最大特征值对应的特征向量
+    except:
+        return None
+
 # ================= 主处理逻辑 =================
 
 def process_replicate(xtc, topo, qm_data, 
@@ -262,18 +277,27 @@ def process_replicate(xtc, topo, qm_data,
     real_phe_ids = offset_calc.get_real_residue_ids(u, PHE_BW_LIST)
     real_obp_ids = offset_calc.get_real_residue_ids(u, OBP_BW_LIST)
     real_plane_ids = offset_calc.get_real_residue_ids(u, PLANE_BW_LIST)
-
+    real_h6_ids = offset_calc.get_real_residue_ids(u, PHE_BW_LIST)
     # 简单检查 (防止没找到残基)
     if not real_phe_ids or not real_obp_ids:
         print(f"     [Error] Failed to map BW residues to Simulation IDs.")
         return None, None, None
-        
+    
+    h6_ref_atom_start = None
+    h6_ref_atom_end = None
+    
+    if real_h6_ids and len(real_h6_ids) == 2:
+        h6_ref_atom_start = u.select_atoms(f"resid {real_h6_ids[0]} and name CA")
+        h6_ref_atom_end   = u.select_atoms(f"resid {real_h6_ids[1]} and name CA")
+    else:
+        print(f"     [Warn] Could not identify 6.51/6.52 CA atoms for orientation feature.")
+
     # 为了兼容后面代码，计算一个名义上的 offset (仅用于统计输出，不参与核心计算)
-    # 假设 PHE_BW_LIST[0] 是 6.48 (F389)，我们看它映射到了哪
+    # 假设 PHE_BW_LIST[0] 是 6.48 (F6.51)，我们看它映射到了哪
     offset = 0 # 默认值
     if real_phe_ids:
         # 这里只是粗略估算，不再用于原子选择
-        offset = real_phe_ids[0] - 389
+        offset = real_phe_ids[0] - 6.51
     
     # 找到配体
     lig_res = find_ligand(u)
@@ -376,14 +400,14 @@ def process_replicate(xtc, topo, qm_data,
     plane_res = u.select_atoms(f"resid {' '.join(map(str, real_plane_ids))} and name CA")
     
     if len(real_phe_ids) >= 1:
-        r389 = u.select_atoms(f"resid {real_phe_ids[0]}")
+        res_6_51 = u.select_atoms(f"resid {real_phe_ids[0]}")
     else:
-        r389 = u.select_atoms("none") # 空选择
+        res_6_51 = u.select_atoms("none") # 空选择
         
     if len(real_phe_ids) >= 2:
-        r390 = u.select_atoms(f"resid {real_phe_ids[1]}")
+        res_6_52 = u.select_atoms(f"resid {real_phe_ids[1]}")
     else:
-        r390 = u.select_atoms("none")
+        res_6_52 = u.select_atoms("none")
 
     global_ring_indices = [lig_res.atoms[i].index for i in md_ring_indices]
     ring_ag = u.atoms[global_ring_indices]
@@ -393,13 +417,13 @@ def process_replicate(xtc, topo, qm_data,
     data = []; vis_accum = np.zeros((len(real_obp_ids)+2, 2)); cnt = 0
 
     feature_vectors = []
-    all_angles_389 = []; all_angles_390 = []
-    all_dist_decays_389 = []; all_dist_decays_390 = []
+    all_angles_6_51 = []; all_angles_6_52 = []
+    all_dist_decays_6_51 = []; all_dist_decays_6_52 = []
 
     # 3. Trajectory Loop
 
     MAX_ATOMS = 9
-    N_ATOM_FEAT = 6 # 每个原子的特征数 = 14 (距离) + 1 (389得分) + 1 (390得分) = 16
+    N_ATOM_FEAT = 6 # 每个原子的特征数 = 14 (距离) + 1 (6.51得分) + 1 (6.52得分) = 16
 
     padded_weights = np.zeros(MAX_ATOMS, dtype=np.float32)
     n_real = min(len(ring_weights_np), MAX_ATOMS)
@@ -417,67 +441,114 @@ def process_replicate(xtc, topo, qm_data,
         dot_val = np.clip(np.dot(ln, pn), -1, 1)
         ga = np.degrees(np.arccos(dot_val)); ga = ga if ga<=90 else 180-ga
         ml_cos_angle = np.abs(dot_val)
-        
-        # 2. 计算 389 相互作用 (保留每个原子的得分)
-        c1, n1 = get_aromatic_ring_data(r389)
 
-        atom_scores_389 = np.zeros(len(lp_ring)) # [N_atoms]
-        atom_dists_389 = np.ones(len(lp_ring)) * 100.0 # 默认距离 100
-        atom_angles_389 = np.zeros(len(lp_ring))
+        # 2. 计算 6.51 相互作用 (保留每个原子的得分)
+        c1, n1 = get_aromatic_ring_data(res_6_51)
 
-        ml_389 = [0.0, 0.0, 0.0]
+        atom_scores_6_51 = np.zeros(len(lp_ring)) # [N_atoms]
+        atom_dists_6_51 = np.ones(len(lp_ring)) * 100.0 # 默认距离 100
+        atom_angles_6_51 = np.zeros(len(lp_ring))
+
+        ml_6_51 = [0.0, 0.0, 0.0]
         if c1 is not None:
-            raw_ang_389, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c1, n1)
-            raw_dist_389, dist_dec = calculate_distance_decay(lp_ring, c1, n1)
+            raw_ang_6_51, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c1, n1)
+            raw_dist_6_51, dist_dec = calculate_distance_decay(lp_ring, c1, n1)
 
-            atom_angles_389 = raw_ang_389
-            atom_dists_389 = raw_dist_389
+            atom_angles_6_51 = raw_ang_6_51
+            atom_dists_6_51 = raw_dist_6_51
 
             # 这里直接拿到每个原子的加权分
-            atom_scores_389 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
+            atom_scores_6_51 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
 
             # comb = calculate_combined_weight(safe_w, ang_dec, dist_dec)
-            s_sum = np.sum(atom_scores_389); s_max = np.max(atom_scores_389)
-            ml_389 = [s_sum, s_max, s_max/(s_sum+1e-6)]
+            s_sum = np.sum(atom_scores_6_51); s_max = np.max(atom_scores_6_51)
+            ml_6_51 = [s_sum, s_max, s_max/(s_sum+1e-6)]
 
             # 用于最后画图/统计 (辅助)
-            all_angles_389.append(ang_dec) # 这里存一下原始角度decay用于统计
-            all_dist_decays_389.append(dist_dec)
+            all_angles_6_51.append(ang_dec) # 这里存一下原始角度decay用于统计
+            all_dist_decays_6_51.append(dist_dec)
 
-        # 3. 计算 390 相互作用 (保留每个原子的得分)
-        c2, n2 = get_aromatic_ring_data(r390)
+        # 3. 计算 6.52 相互作用 (保留每个原子的得分)
+        c2, n2 = get_aromatic_ring_data(res_6_52)
 
-        atom_scores_390 = np.zeros(len(lp_ring)) # [N_atoms]
-        atom_dists_390 = np.ones(len(lp_ring)) * 100.0
-        atom_angles_390 = np.zeros(len(lp_ring))
+        atom_scores_6_52 = np.zeros(len(lp_ring)) # [N_atoms]
+        atom_dists_6_52 = np.ones(len(lp_ring)) * 100.0
+        atom_angles_6_52 = np.zeros(len(lp_ring))
 
-        ml_390 = [0.0, 0.0, 0.0]
+        ml_6_52 = [0.0, 0.0, 0.0]
         if c2 is not None:
-            raw_ang_390, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c2, n2)
-            raw_dist_390, dist_dec = calculate_distance_decay(lp_ring, c2, n2)
+            raw_ang_6_52, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c2, n2)
+            raw_dist_6_52, dist_dec = calculate_distance_decay(lp_ring, c2, n2)
 
-            atom_angles_390 = raw_ang_390
-            atom_dists_390 = raw_dist_390
+            atom_angles_6_52 = raw_ang_6_52
+            atom_dists_6_52 = raw_dist_6_52
 
             # 这里直接拿到每个原子的加权分
-            atom_scores_390 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
+            atom_scores_6_52 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
 
             # comb = calculate_combined_weight(safe_w, ang_dec, dist_dec)
-            s_sum = np.sum(atom_scores_390); s_max = np.max(atom_scores_390)
-            ml_390 = [s_sum, s_max, s_max/(s_sum+1e-6)]
+            s_sum = np.sum(atom_scores_6_52); s_max = np.max(atom_scores_6_52)
+            ml_6_52 = [s_sum, s_max, s_max/(s_sum+1e-6)]
 
             # 用于最后画图/统计 (辅助)
-            all_angles_390.append(ang_dec)
-            all_dist_decays_390.append(dist_dec)
+            all_angles_6_52.append(ang_dec)
+            all_dist_decays_6_52.append(dist_dec)
 
+        orientation_feat = 0.0 # 默认值 (比如 0度 或 某个占位符)
+        
+        # 必须确保找到了 6.51/6.52 参考原子 (前面代码已获取 h6_ref_atom_start/end)
+        if h6_ref_atom_start is not None and h6_ref_atom_end is not None and len(h6_ref_atom_start)>0:
+            
+            # 1. 计算参考向量 (Helix 6 Axis)
+            p_s = h6_ref_atom_start.positions[0]
+            p_e = h6_ref_atom_end.positions[0]
+            ref_vec = p_e - p_s
+            norm_ref = np.linalg.norm(ref_vec)
+            
+            if norm_ref > 0.1:
+                ref_vec_u = ref_vec / norm_ref
+                
+                # 2. 筛选配体原子 (Top-K Strategy)
+                # ---------------------------------------------------
+                # 逻辑修改：不再使用阈值，而是取 Top 3
+                # ---------------------------------------------------
+                
+                # 过滤掉得分为 0 的原子 (距离太远被截断的)
+                valid_mask = atom_scores_6_51 > 0.01 
+                valid_indices = np.where(valid_mask)[0]
+                valid_scores = atom_scores_6_51[valid_indices]
+                
+                # 至少要有 3 个原子才能稳定定义一个面的取向
+                # 如果只有 2 个原子，PCA 得到的是线，勉强也能用，但 3 个更好
+                if len(valid_indices) >= 2: 
+                    # 对分数排序，取前 K 个
+                    K = 2
+                    # argsort 是从小到大，所以取最后 K 个
+                    if len(valid_scores) > K:
+                        top_k_local_idx = np.argsort(valid_scores)[-K:]
+                        final_indices = valid_indices[top_k_local_idx]
+                    else:
+                        final_indices = valid_indices # 不够 K 个就全用
+                    
+                    eff_pos = lp_ring[final_indices]
+                    eff_w   = atom_scores_6_51[final_indices]
+                    
+                    # 3. PCA 计算主轴
+                    lig_axis = calculate_principal_axis(eff_pos, eff_w)
+                    
+                    if lig_axis is not None:
+                        # 4. 计算夹角 (0=平行, 90=垂直)
+                        dot_val = np.clip(np.dot(lig_axis, ref_vec_u), -1, 1)
+                        angle_rad = np.arccos(np.abs(dot_val))
+                        orientation_feat = np.degrees(angle_rad)
         # C. 构建特征向量
 
         # 当前帧的原子特征矩阵: [N_atoms, 14]
-        # 列: [Dist_1...Dist_12, Score_389, Score_390]
+        # 列: [Dist_1...Dist_12, Score_6_51, Score_6_52]
         current_frame_atoms = np.column_stack([
-            atom_dists_389, atom_angles_389,
-            atom_dists_390, atom_angles_390,
-            atom_scores_389, atom_scores_390
+            atom_dists_6_51, atom_angles_6_51,
+            atom_dists_6_52, atom_angles_6_52,
+            atom_scores_6_51, atom_scores_6_52
         ])
 
         # 初始化距离特征矩阵（N_ATOM_FEAT x MAX_ATOMS）
@@ -492,11 +563,11 @@ def process_replicate(xtc, topo, qm_data,
         # 原子部分: 9 atoms x 6 features = 54维
         flat_atoms = padded_frame.flatten()  # 54维
 
-        # 全局部分：Angle (1) + 389 scores (3) + 390 scores (3) = 7
-        global_feats = np.concatenate([[ml_cos_angle], ml_389, ml_390])  # 7维
+        # 全局部分：Angle (1) + 6.51 scores (3) + 6.52 scores (3) + Orientation (1) = 8
+        global_feats = np.concatenate([[ml_cos_angle], ml_6_51, ml_6_52, [orientation_feat]])  # 8维
 
-        # 最终特征向量: 54 + 7 + 9 = 70维
-        feat = np.concatenate([flat_atoms, global_feats])  # 70维
+        # 最终特征向量: 54 + 8 = 62维
+        feat = np.concatenate([flat_atoms, global_feats])  # 62维
         feature_vectors.append(feat)
 
         # D. 可视化对齐 & 数据记录
@@ -510,8 +581,8 @@ def process_replicate(xtc, topo, qm_data,
         # E. 记录时间序列数据
         row = {
             "Time": ts.time, "Replica": rep_name, "Global_Angle": ga,
-            "Phe389_Score_Sum": ml_389[0], "Phe389_Score_Max": ml_389[1],
-            "Phe390_Score_Sum": ml_390[0], "Phe390_Score_Max": ml_390[1]
+            "Phe6.51_Score_Sum": ml_6_51[0], "Phe6.51_Score_Max": ml_6_51[1],
+            "Phe6.52_Score_Sum": ml_6_52[0], "Phe6.52_Score_Max": ml_6_52[1]
             }
         data.append(row)
 
@@ -541,15 +612,15 @@ def process_replicate(xtc, topo, qm_data,
 
     stats = {
         "Compound": cid, "Replica": rep_name, "Offset": offset,
-        "Phe389_Score_Sum_Mean": df["Phe389_Score_Sum"].mean(), 
-        "Phe390_Score_Sum_Mean": df["Phe390_Score_Sum"].mean()
+        "Phe6.51_Score_Sum_Mean": df["Phe6.51_Score_Sum"].mean(), 
+        "Phe6.52_Score_Sum_Mean": df["Phe6.52_Score_Sum"].mean()
     }
     
     strength = None
-    if all_angles_389 and all_angles_390:
+    if all_angles_6_51 and all_angles_6_52:
         strength = calculate_interaction_strength(
-            safe_w, np.mean(all_angles_389, 0), np.mean(all_angles_390, 0),
-            np.mean(all_dist_decays_389, 0), np.mean(all_dist_decays_390, 0)
+            safe_w, np.mean(all_angles_6_51, 0), np.mean(all_angles_6_52, 0),
+            np.mean(all_dist_decays_6_51, 0), np.mean(all_dist_decays_6_52, 0)
         )
         if strength: stats.update(strength)
 

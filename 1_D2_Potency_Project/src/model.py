@@ -54,7 +54,7 @@ class EfficiencyPredictor(nn.Module):
         # 全局部分：7维（1个角度 + 6个电子特征） -> 7维
         self.n_atoms = 9
         self.atom_feat_dim = 6
-        self.global_feat_dim = 7
+        self.global_feat_dim = 8
 
         self.atom_hidden_dim = 64 
         # DeepSets 内部隐藏维度 = 64(SUM) + 64(MAX) = 128维

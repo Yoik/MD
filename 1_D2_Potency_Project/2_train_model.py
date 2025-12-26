@@ -40,6 +40,15 @@ BATCH_SIZE = config.get_int("training.batch_size") #··批量大小
 # 建议 0.001 - 0.005
 L1_LAMBDA = config.get_float("training.l1_lambda") #··L1 稀疏惩罚系数
 
+# ================= 创建输出目录 =================
+from datetime import datetime 
+
+FEATURE_DIR = RESULT_DIR
+# 创建带日期时间的输出目录，例如 2025-12-27_23-50-12 
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") 
+OUTPUT_DIR = os.path.join(RESULT_DIR, timestamp) 
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 def main():
     print("Preparing data...")
     try:
@@ -263,7 +272,7 @@ def main():
     if loocv_results:
         # 1. 保存 CSV
         df_res = pd.DataFrame(loocv_results)
-        csv_path = os.path.join(RESULT_DIR, "loocv_results.csv")
+        csv_path = os.path.join(OUTPUT_DIR, "loocv_results.csv")
         df_res.to_csv(csv_path, index=False)
         print(f"[Save] Results saved to: {csv_path}")
 
@@ -277,7 +286,7 @@ def main():
         print(summary.sort_values(by='Pred_Diff_Score', ascending=False).to_string(index=False))
 
         # 2. 保存 Loss 曲线 JSON
-        json_path = os.path.join(RESULT_DIR, "loocv_losses.json")
+        json_path = os.path.join(OUTPUT_DIR, "loocv_losses.json")
         with open(json_path, 'w') as f:
             json.dump(all_fold_losses, f)
         print(f"[Save] Loss history saved to: {json_path}")
@@ -336,8 +345,8 @@ def main():
 
     # 获取 Phe 的 BW 编号 (例如 6.48, 6.51)
     PHE_LABELS = config.get_list("residues.phe_residues")
-    p1 = PHE_LABELS[0] if len(PHE_LABELS) > 0 else "Phe1" # 389 -> 6.48
-    p2 = PHE_LABELS[1] if len(PHE_LABELS) > 1 else "Phe2" # 390 -> 6.51
+    p1 = PHE_LABELS[0] if len(PHE_LABELS) > 0 else "Phe1" # 6.51
+    p2 = PHE_LABELS[1] if len(PHE_LABELS) > 1 else "Phe2" # 6.52
     # ==========================================================
     # 生成特征名称列表
     # ==========================================================
@@ -363,6 +372,8 @@ def main():
     # p2 = PHE_LABELS[1] if len(PHE_LABELS) > 1 else "Phe2"
     FEATURE_NAMES.extend([f"{p2}_Global_Sum", f"{p2}_Global_Max", f"{p2}_Global_Norm"])
 
+    # 4. 方向性特征 (1维)
+    FEATURE_NAMES.append("Lig_H6_Orientation")
     # ==========================================================
 
     # 简单检查一下维度是否对齐
@@ -392,7 +403,7 @@ def main():
         })
     
     df_feat = pd.DataFrame(feature_data)
-    feat_csv_path = os.path.join(RESULT_DIR, "feature_importance.csv")
+    feat_csv_path = os.path.join(OUTPUT_DIR, "feature_importance.csv")
     df_feat.to_csv(feat_csv_path, index=False)
     print(f"[Save] Feature importance saved to: {feat_csv_path}")
     # =============================================================
