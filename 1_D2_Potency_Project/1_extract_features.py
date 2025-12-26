@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 import sys
+import argparse
 from scipy.spatial.distance import cdist
 import io
 import tempfile
@@ -362,8 +363,6 @@ def process_replicate(xtc, topo, qm_data,
     if not md_ring_indices or not md_geo_indices:
         print(f"     [Error] Ring atoms mapped to nowhere!")
         return None, None, None
-    
-
 
     ring_weights_np = np.array(extracted_ring_weights)
     
@@ -373,13 +372,8 @@ def process_replicate(xtc, topo, qm_data,
         print(f"            Geometry Center Atoms: {len(md_geo_indices)}")
 
     # 2. Prepare AtomGroups
-    # obp_ids = [x + offset for x in OBP_RESIDUES_STD]
-    # plane_ids = [x + offset for x in PLANE_RESIDUES_STD]
     obp_atoms = u.select_atoms(f"resid {' '.join(map(str, real_obp_ids))} and name CA")
     plane_res = u.select_atoms(f"resid {' '.join(map(str, real_plane_ids))} and name CA")
-
-    # t389 = 389 + offset; t390 = 390 + offset
-    # r389 = u.select_atoms(f"resid {t389}"); r390 = u.select_atoms(f"resid {t390}")
     
     if len(real_phe_ids) >= 1:
         r389 = u.select_atoms(f"resid {real_phe_ids[0]}")
@@ -404,15 +398,17 @@ def process_replicate(xtc, topo, qm_data,
 
     # 3. Trajectory Loop
 
-    # constant features defined
     MAX_ATOMS = 9
-    N_OBP = len(OBP_BW_LIST) # 14 个 OBP 残基
-    N_ATOM_FEAT = N_OBP + 2 # 每个原子的特征数 = 14 (距离) + 1 (389得分) + 1 (390得分) = 16
+    N_ATOM_FEAT = 6 # 每个原子的特征数 = 14 (距离) + 1 (389得分) + 1 (390得分) = 16
+
+    padded_weights = np.zeros(MAX_ATOMS, dtype=np.float32)
+    n_real = min(len(ring_weights_np), MAX_ATOMS)
+    padded_weights[:n_real] = ring_weights_np[:n_real]
 
     for ts in u.trajectory:
         lp_ring = ring_ag.positions # ligand ring positions
         lp_geo = geo_ag.positions
-        lc_geo = lp_geo.mean(0) # Ligand Center (Geometry Atoms)
+        # lc_geo = lp_geo.mean(0) # Ligand Center (Geometry Atoms)
         safe_w = np.maximum(ring_weights_np, 0.0)
 
         # A. 几何角度计算
@@ -422,23 +418,20 @@ def process_replicate(xtc, topo, qm_data,
         ga = np.degrees(np.arccos(dot_val)); ga = ga if ga<=90 else 180-ga
         ml_cos_angle = np.abs(dot_val)
         
-        # B. 原子级特征提取
-        # 1. 计算芳香环原子与OBP的距离矩阵[N_atoms x N_OBP]
-        dists_obp = distance_array(lp_ring, obp_atoms.positions, box=u.dimensions)
-
-        # 容错：如果 OBP 残基缺失，补 100.0
-        if dists_obp.shape[1] < N_OBP:
-            padded_dists = np.ones((len(lp_ring), N_OBP)) * 100.0
-            padded_dists[:, :dists_obp.shape[1]] = dists_obp
-            dists_obp = padded_dists
-
         # 2. 计算 389 相互作用 (保留每个原子的得分)
         c1, n1 = get_aromatic_ring_data(r389)
+
         atom_scores_389 = np.zeros(len(lp_ring)) # [N_atoms]
+        atom_dists_389 = np.ones(len(lp_ring)) * 100.0 # 默认距离 100
+        atom_angles_389 = np.zeros(len(lp_ring))
+
         ml_389 = [0.0, 0.0, 0.0]
         if c1 is not None:
-            _, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c1, n1)
-            _, dist_dec = calculate_distance_decay(lp_ring, c1, n1)
+            raw_ang_389, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c1, n1)
+            raw_dist_389, dist_dec = calculate_distance_decay(lp_ring, c1, n1)
+
+            atom_angles_389 = raw_ang_389
+            atom_dists_389 = raw_dist_389
 
             # 这里直接拿到每个原子的加权分
             atom_scores_389 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
@@ -453,11 +446,18 @@ def process_replicate(xtc, topo, qm_data,
 
         # 3. 计算 390 相互作用 (保留每个原子的得分)
         c2, n2 = get_aromatic_ring_data(r390)
+
         atom_scores_390 = np.zeros(len(lp_ring)) # [N_atoms]
+        atom_dists_390 = np.ones(len(lp_ring)) * 100.0
+        atom_angles_390 = np.zeros(len(lp_ring))
+
         ml_390 = [0.0, 0.0, 0.0]
         if c2 is not None:
-            _, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c2, n2)
-            _, dist_dec = calculate_distance_decay(lp_ring, c2, n2)
+            raw_ang_390, ang_dec = calculate_carbon_angles_and_decay(lp_ring, c2, n2)
+            raw_dist_390, dist_dec = calculate_distance_decay(lp_ring, c2, n2)
+
+            atom_angles_390 = raw_ang_390
+            atom_dists_390 = raw_dist_390
 
             # 这里直接拿到每个原子的加权分
             atom_scores_390 = calculate_combined_weight(safe_w, ang_dec, dist_dec)
@@ -474,25 +474,29 @@ def process_replicate(xtc, topo, qm_data,
 
         # 当前帧的原子特征矩阵: [N_atoms, 14]
         # 列: [Dist_1...Dist_12, Score_389, Score_390]
-        current_frame_atoms = np.column_stack([dists_obp, atom_scores_389, atom_scores_390])
+        current_frame_atoms = np.column_stack([
+            atom_dists_389, atom_angles_389,
+            atom_dists_390, atom_angles_390,
+            atom_scores_389, atom_scores_390
+        ])
 
         # 初始化距离特征矩阵（N_ATOM_FEAT x MAX_ATOMS）
         padded_frame = np.ones((MAX_ATOMS, N_ATOM_FEAT), dtype=np.float32) * 100.0 # 填充为大值
-        padded_frame[:, N_OBP:] = 0.0  # 得分部分填充为0
+        padded_frame[:, [1, 3, 4, 5]] = 0.0  # 得分部分填充为0
 
         # 复制当前帧数据到填充矩阵
         n_real = min(len(lp_ring), MAX_ATOMS)
         padded_frame[:n_real, :] = current_frame_atoms[:n_real, :]
 
         # 展平为一维向量
-        # 原子部分: 9 atoms x 14 features = 126
-        flat_atoms = padded_frame.flatten()  # 126维
+        # 原子部分: 9 atoms x 6 features = 54维
+        flat_atoms = padded_frame.flatten()  # 54维
 
         # 全局部分：Angle (1) + 389 scores (3) + 390 scores (3) = 7
         global_feats = np.concatenate([[ml_cos_angle], ml_389, ml_390])  # 7维
 
-        # 最终特征向量: 126 + 7 = 133维
-        feat = np.concatenate([flat_atoms, global_feats])  # 133维
+        # 最终特征向量: 54 + 7 + 9 = 70维
+        feat = np.concatenate([flat_atoms, global_feats])  # 70维
         feature_vectors.append(feat)
 
         # D. 可视化对齐 & 数据记录
@@ -553,6 +557,11 @@ def process_replicate(xtc, topo, qm_data,
     return df, stats, strength
 
 def main():
+    # 【新增】参数解析
+    parser = argparse.ArgumentParser(description="Extract Features from MD Trajectories")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing feature files if they exist.")
+    args = parser.parse_args()
+    
     root = "."
     if not os.path.exists(OUTPUT_BASE_DIR): os.makedirs(OUTPUT_BASE_DIR)
     GLOBAL_MAX = get_dopa_global_max(root)
@@ -619,6 +628,11 @@ def main():
             if topo:
                 # 使用 unique_rn 初始化 OutputHandler
                 output_handler = OutputHandler(cid, unique_rn, OUTPUT_BASE_DIR)
+
+                # 【新增】检查文件是否存在
+                if not args.overwrite and output_handler.check_features_exist():
+                    print(f"  [Skip] Features exist for {unique_rn} (Use --overwrite to force)")
+                    continue
                 
                 ts, st, strength = process_replicate(
                     xtc, topo, qm_data, 

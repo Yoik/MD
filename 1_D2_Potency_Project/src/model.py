@@ -50,10 +50,10 @@ class EfficiencyPredictor(nn.Module):
         super(EfficiencyPredictor, self).__init__()
         
         # 配置参数
-        # 原子部分：9个原子，每个原子16维特征 -> 144维
+        # 原子部分：9个原子，每个原子6维特征 -> 54维
         # 全局部分：7维（1个角度 + 6个电子特征） -> 7维
         self.n_atoms = 9
-        self.atom_feat_dim = 16
+        self.atom_feat_dim = 6
         self.global_feat_dim = 7
 
         self.atom_hidden_dim = 64 
@@ -66,7 +66,9 @@ class EfficiencyPredictor(nn.Module):
         # === 【核心修改】动态特征掩码 (Dynamic Feature Mask) ===
         # 初始化为 0.5 (sigmoid(0) = 0.5)，表示“不确定是否有用”
         # 模型会自己学习把它推向 1 (有用) 或 0 (无用)
-        self.feature_mask_logits = nn.Parameter(torch.ones(input_dim) * 2.0)
+        self.atom_mask_logits = nn.Parameter(torch.ones(self.atom_feat_dim) * 2.0)
+
+        self.global_mask_logits = nn.Parameter(torch.ones(self.global_feat_dim) * 2.0)
         
         # === 1. 原子集合编码器 ===
         self.atom_encoder = AtomSetEncoder(self.atom_feat_dim, self.atom_hidden_dim)
@@ -90,52 +92,110 @@ class EfficiencyPredictor(nn.Module):
             nn.Linear(32, 1)
         )
 
-    def forward(self, x):
-        # x shape: [Batch, Frames, 151]
-
-        # === 【核心修改】应用动态掩码 ===
-        # 生成 0-1 的门控值
-        mask = torch.sigmoid(self.feature_mask_logits)
-        # 广播应用: [151] -> [1, 1, 151]
-        x_masked = x * mask.view(1, 1, -1)
-
-        batch_size, num_frames, _ = x_masked.shape
+    def forward_one(self, x):
+        # x input shape: [Batch, Frames, 9*6 + 7] = [B, F, 61] (假设输入是拼接好的)
+        batch_size, num_frames, _ = x.shape
+        
+        # ============================================================
+        # 4. 【核心修改】先拆分，再 Mask
+        # ============================================================
         
         # --- A. 拆分特征 ---
-        # 1. 拆分特征
-        x_atoms_flat = x_masked[:, :, :self.n_atoms * self.atom_feat_dim]
-        x_global = x_masked[:, :, self.n_atoms * self.atom_feat_dim:]
+        # 算出原子特征的总长度: 9 * 6 = 54
+        num_atom_feats = self.n_atoms * self.atom_feat_dim
         
-        # 2. 重塑原子特征形状: [B, F, 9, 14]
+        # 切片：原子部分
+        x_atoms_flat = x[:, :, :num_atom_feats] # [B, F, 54]
+        # 切片：全局部分
+        x_global = x[:, :, num_atom_feats:]     # [B, F, 7]
+        
+        # --- B. 变形原子特征 ---
+        # [B, F, 54] -> [B, F, 9, 6]
+        # 这样我们才能对最后一维(6个特征)应用共享 Mask
         x_atoms = x_atoms_flat.view(batch_size, num_frames, self.n_atoms, self.atom_feat_dim)
+        
+        # --- C. 应用共享 Mask (Broadcasting) ---
+        # 生成 Mask (0~1)
+        atom_mask = torch.sigmoid(self.atom_mask_logits)     # [6]
+        global_mask = torch.sigmoid(self.global_mask_logits) # [7]
+        
+        # 广播乘法：
+        # atom_mask [6] 会自动扩充为 [1, 1, 1, 6] 应用到每个原子
+        x_atoms_masked = x_atoms * atom_mask.view(1, 1, 1, -1)
+        
+        # global_mask [7] 扩充为 [1, 1, 7]
+        x_global_masked = x_global * global_mask.view(1, 1, -1)
+        
+        # ============================================================
+        # 5. 进入网络骨架（DeepSets 聚合）
+        # ============================================================
+        # 这里的输入 x_atoms_masked 已经是“加权”过的了
+        # 但它依然是无序的集合，DeepSets 会公平处理
+        ring_feats = self.atom_encoder(x_atoms_masked) # Output: [B, F, 128]
 
-        # --- B. 提取单帧特征 ---
-        # 1. 通过DeepSets编码原子集合
-        ring_feats = self.atom_encoder(x_atoms)  # [B, F, 128]
-
-        # 2. 拼接全局特征
-        frame_feats = torch.cat([ring_feats, x_global], dim=-1)  #
+        # 拼接全局特征
+        frame_feats = torch.cat([ring_feats, x_global_masked], dim=-1) # [B, F, 135]
         
-        # --- C. 计算分数与注意力 ---
-        # 1. 每一帧的效能分数 (0-1)
-        # 代表：这一帧的构象+电子状态，理论上能激活受体吗？
-        frame_scores = self.frame_scorer(frame_feats) # [B, F, 1]
+        # --- 后续预测逻辑不变 ---
+        frame_scores = self.frame_scorer(frame_feats)
+        attn_logits = self.attn_net(frame_feats)
+        attn_weights = F.softmax(attn_logits, dim=1)
         
-        # 2. 每一帧的注意力权重
-        # 代表：这一帧是噪音还是关键帧？
-        attn_logits = self.attn_net(frame_feats) # [B, F, 1]
-        attn_weights = F.softmax(attn_logits, dim=1) # 在时间轴归一化
-        
-        # --- D. 宏观聚合 ---
-        # 加权求和: Sum(Score * Weight)
         weighted_scores = frame_scores * attn_weights
-        macro_pred = torch.sum(weighted_scores, dim=1).squeeze(-1) # [Batch]
+        macro_pred = torch.sum(weighted_scores, dim=1).squeeze(-1)
         
-        # 为了兼容之前的训练代码，返回 4 个值
-        # gate_val 这里已经融入 frame_scores 了，返回 frame_scores 作为替代
+        # 为了兼容训练代码，构造 mask 返回值
+        # 我们把两个 mask 拼起来返回，方便你看 feature importance
+        # 注意：这里需要把 atom_mask 复制 9 份拼回去，才能对齐原来的名字列表
+        full_atom_mask = atom_mask.repeat(self.n_atoms) # [54]
+        full_mask = torch.cat([full_atom_mask, global_mask], dim=0) # [61]
+        
         return {
-            "pred": macro_pred,           # 对应 out["pred"]
-            "frame_scores": frame_scores, # 对应 out["frame_scores"]
-            "attn": attn_weights,          # 对应 out["attn"]
-            "mask": mask
+            "pred": macro_pred,
+            "mask": full_mask, # 这样你的 feature_importance.csv 代码依然能跑
+            "frame_scores": frame_scores,
+            "attn_weights": attn_weights
         }
+    # ==========================================================================
+    ### 主 forward 支持双输入
+    # ==========================================================================
+    def forward(self, x, x_ref=None):
+        """
+        x: Query 化合物特征
+        x_ref: (可选) Reference 化合物特征。如果提供，则执行孪生网络模式。
+        """
+        # 1. 计算 Query 的结果
+        out_query = self.forward_one(x)
+        
+        # 2. 如果提供了 Ref
+        if x_ref is not None:
+            # 检查维度：如果是 4 维 [Batch, N_Refs, Frames, Feats]，说明是“全量模式”
+            if x_ref.dim() == 4:
+                batch_size, n_refs, frames, feats = x_ref.shape
+                
+                # A. 展平为大 Batch 进行并行计算
+                # [B * N, F, D]
+                x_ref_flat = x_ref.view(-1, frames, feats)
+                
+                # B. 计算所有片段的分数
+                out_ref_flat = self.forward_one(x_ref_flat)
+                scores_flat = out_ref_flat['pred'] # [B * N]
+                
+                # C. 变回形状并取平均
+                scores_grouped = scores_flat.view(batch_size, n_refs)
+                score_ref_mean = scores_grouped.mean(dim=1) # [B] -> 得到平均基准分
+                
+                # 构造一个类似的返回字典 (mask 等取第一个即可)
+                out_ref = {
+                    "pred": score_ref_mean, # 平均后的分数
+                    "mask": out_ref_flat['mask'] # mask 是共享参数，一样的
+                }
+                
+                return out_query, out_ref
+                
+            else:
+                # 兼容旧的一对一模式
+                out_ref = self.forward_one(x_ref)
+                return out_query, out_ref        
+        # 3. 只有 Query (推理模式)
+        return out_query

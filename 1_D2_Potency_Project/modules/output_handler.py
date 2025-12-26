@@ -17,6 +17,12 @@ class OutputHandler:
         self.replica_name = replica_name
         self.output_dir = Path(output_base_dir) / compound_id / replica_name
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def check_features_exist(self, filename_suffix=""):
+        """检查特征文件是否已存在"""
+        filename = f"{self.compound_id}_{self.replica_name}_features{filename_suffix}.npy"
+        filepath = self.output_dir / filename
+        return filepath.exists()
     
     def save_timeseries(self, df, filename_suffix=""):
         """保存时间序列数据 (CSV)"""
