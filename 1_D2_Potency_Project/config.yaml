@@ -17,7 +17,7 @@ data:
   # 特征提取相关
   integration_radius: 1.5          # 积分半径 (Å)
   pocket_atom_num: 12              # 口袋原子数
-  input_dim_features: 61          # 特征提取时的输入维度
+  input_dim_features: 62          # 特征提取时的输入维度
   input_dim_eval: 19               # 评估时的输入维度 (如果不同)
   
   # 序列配置

@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import copy
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+import random
 from tqdm import tqdm
 from torch.utils.data import DataLoader, Subset
 from sklearn.model_selection import LeaveOneOut 
@@ -34,7 +36,7 @@ DROPOUT_RATE = config.get_float("training.dropout_rate") #··Dropout 比例
 WEIGHT_DECAY = config.get_float("training.weight_decay") #··权重衰减
 NUM_EPOCHS = config.get_int("training.num_epochs") #··训练轮数 
 BATCH_SIZE = config.get_int("training.batch_size") #··批量大小
-
+seed = config.get_int("misc.random_seed") #··随机种子
 # 【新增】稀疏惩罚系数
 # 值越大，模型删特征越狠；值越小，模型保留特征越多
 # 建议 0.001 - 0.005
@@ -49,7 +51,40 @@ timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 OUTPUT_DIR = os.path.join(RESULT_DIR, timestamp) 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+# ================= [新增] 日志双向输出 =================
+class Logger(object):
+    def __init__(self, filename):
+        self.terminal = sys.stdout
+        self.log = open(filename, "a", encoding='utf-8')
+
+    def write(self, message):
+        self.terminal.write(message)
+        self.log.write(message)
+        self.log.flush()
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+# 这一行执行后，所有的 print() 都会同时出现在屏幕和 log.txt 里
+sys.stdout = Logger(os.path.join(OUTPUT_DIR, "training_log.txt"))
+
+# ================= 设置随机种子 =================
+def seed_everything(seed=42):
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    # 下面两行会让卷积计算变慢，但能保证绝对一致
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    print(f"Random seed set to: {seed}")
+
 def main():
+    seed_everything(seed)
+    # ================= 数据准备 =================
     print("Preparing data...")
     try:
         train_ds, test_ds = prepare_data(
@@ -137,9 +172,21 @@ def main():
         all_ref_tensor = curr_train_ds.ref_tensor.to(device)
 
         model = EfficiencyPredictor(input_dim=INPUT_DIM, dropout_rate=DROPOUT_RATE).to(device)
+
+        # Adam 优化器
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
         criterion = nn.MarginRankingLoss(margin=0.1)        
         # ================ 训练 =================
+
+        # ================= 学习率衰减调度器 =================
+        # 每 20 个 Epoch 学习率减半 (60个Epoch会衰减2次: 20, 40)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+
+        # ================= 初始化最佳记录变量 =================
+        best_loss = float('inf')
+        best_model_wts = copy.deepcopy(model.state_dict())
+        # ====================================================
+
         model.train()
         epoch_bar = tqdm(range(NUM_EPOCHS), desc=f"Training {test_cmpd_name}", leave=False)
 
@@ -164,7 +211,7 @@ def main():
 
                 # B. 计算 Query
                 out_q = model.forward_one(q_traj)
-                score_q = out_q["pred"].squeeze()
+                score_q = out_q["pred"].view(-1)
                 
                 # C. Loss 计算
                 # 此时 score_ref_mean 是带有梯度的，模型可以去优化它！
@@ -185,7 +232,7 @@ def main():
             with torch.no_grad():
                 # 计算 Test Query
                 out_test_q = model.forward_one(test_query_tensor)
-                score_test_q = out_test_q["pred"].squeeze()
+                score_test_q = out_test_q["pred"].view(-1)
                 
                 # [为了严谨] 在 Eval 模式下重新算一遍 Ref 基准分
                 # 因为 Eval 模式下 Dropout 行为不同，分数会有微小差异
@@ -202,6 +249,15 @@ def main():
                 
                 val_loss_val = test_loss.item()
 
+                # ================= [新增 3] 学习率衰减 & 保存最佳模型 =================
+                # B. 检查是否是最佳 Loss
+                if val_loss_val < best_loss:
+                    best_loss = val_loss_val
+                    # 深拷贝当前这一刻的模型参数，暂存在内存中
+                    best_model_wts = copy.deepcopy(model.state_dict())
+            # A. 更新学习率 (每个 Epoch 结束时调用)
+            scheduler.step()
+
             # --- 3. 记录与显示 ---
             current_fold_losses['train'].append(avg_train_loss)
             current_fold_losses['test'].append(val_loss_val)
@@ -213,6 +269,9 @@ def main():
 
         all_fold_losses[test_cmpd_name] = current_fold_losses # 保存当前轮的 Loss 曲线
 
+        # ================= 恢复最佳模型权重 =================
+        model.load_state_dict(best_model_wts)
+        print(f"  -> Best Test Loss: {best_loss:.4f} (Restored weights)")
         # ================= 测试 (Relative Scoring) =================
         model.eval()
         diff_scores = []
@@ -307,6 +366,9 @@ def main():
     final_model = EfficiencyPredictor(input_dim=INPUT_DIM, dropout_rate=DROPOUT_RATE).to(device)
     optimizer = torch.optim.Adam(final_model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     
+    # 定义学习率调度器
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.5)
+
     final_model.train()
     print("Final Retraining...")
     for epoch in tqdm(range(NUM_EPOCHS), desc="Final Mask Learning"):
@@ -323,6 +385,7 @@ def main():
                    + L1_LAMBDA * torch.mean(out_q['mask'])
             loss.backward()
             optimizer.step()
+        scheduler.step() # 每个 Epoch 结束时调用
     # 1. 获取 6 维的原子 Mask 和 7 维的全局 Mask
     atom_mask_vals = torch.sigmoid(final_model.atom_mask_logits).detach().cpu() # [6]
     global_mask_vals = torch.sigmoid(final_model.global_mask_logits).detach().cpu() # [7]

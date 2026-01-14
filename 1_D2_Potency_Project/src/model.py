@@ -66,9 +66,9 @@ class EfficiencyPredictor(nn.Module):
         # === 【核心修改】动态特征掩码 (Dynamic Feature Mask) ===
         # 初始化为 0.5 (sigmoid(0) = 0.5)，表示“不确定是否有用”
         # 模型会自己学习把它推向 1 (有用) 或 0 (无用)
-        self.atom_mask_logits = nn.Parameter(torch.ones(self.atom_feat_dim) * 2.0)
+        self.atom_mask_logits = nn.Parameter(torch.ones(self.atom_feat_dim) * 0.5)
 
-        self.global_mask_logits = nn.Parameter(torch.ones(self.global_feat_dim) * 2.0)
+        self.global_mask_logits = nn.Parameter(torch.ones(self.global_feat_dim) * 0.5)
         
         # === 1. 原子集合编码器 ===
         self.atom_encoder = AtomSetEncoder(self.atom_feat_dim, self.atom_hidden_dim)

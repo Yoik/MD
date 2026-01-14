@@ -79,7 +79,7 @@ def prepare_data(label_file, result_dir, ref_feature_path,  # <--- [新增参数
         
         # 模糊匹配文件夹路径
         compound_folder_pattern = os.path.join(result_dir, f"*{cmpd_name}*")
-        matching_folders = glob.glob(compound_folder_pattern)
+        matching_folders = sorted(glob.glob(compound_folder_pattern))
         
         if not matching_folders:
             # 没跑完的数据跳过不报错，保持安静
@@ -89,7 +89,7 @@ def prepare_data(label_file, result_dir, ref_feature_path,  # <--- [新增参数
         found_data = False
         for folder in matching_folders:
             npy_search = os.path.join(folder, "*", "*_features.npy")
-            files = glob.glob(npy_search)
+            files = sorted(glob.glob(npy_search))
             
             for f in files:
                 try:
