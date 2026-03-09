@@ -1,0 +1,87 @@
+Random seed set to: 42
+Preparing data...
+Scanning data for 15 compounds...
+  -> Slicing Strategy: Window=100, Stride=20
+Processing Reference Data from dir: data/features/20251115_D2_Dopa_cryoEM_rebuild
+  -> Found 6 reference files.
+  -> Loaded 5011 frames from reference.
+  -> Generated 226 reference slices.
+Split Strategy: Grouped by Compound ID (Slicing Enabled)
+Train: 8 compounds -> 1150 slices
+Test : 3 compounds -> 354 slices
+Total Compounds: 11
+Starting LOO-CV with Dynamic Masking...
+
+>>> Round 1 / 10 | Testing: ARI
+  -> Best Test Loss: 0.0087 (Restored weights)
+
+>>> Round 2 / 10 | Testing: BRE
+  -> Best Test Loss: 0.0071 (Restored weights)
+
+>>> Round 3 / 10 | Testing: CAR
+  -> Best Test Loss: 0.0068 (Restored weights)
+
+>>> Round 4 / 10 | Testing: LSD
+  -> Best Test Loss: 0.0071 (Restored weights)
+
+>>> Round 5 / 10 | Testing: Lisu
+  -> Best Test Loss: 0.0071 (Restored weights)
+
+>>> Round 6 / 10 | Testing: R10
+  -> Best Test Loss: 0.0070 (Restored weights)
+
+>>> Round 7 / 10 | Testing: ROT
+  -> Best Test Loss: 0.0094 (Restored weights)
+
+>>> Round 8 / 10 | Testing: S10
+  -> Best Test Loss: 0.0071 (Restored weights)
+
+>>> Round 9 / 10 | Testing: S84
+  -> Best Test Loss: 0.0071 (Restored weights)
+
+>>> Round 10 / 10 | Testing: UNC
+  -> Best Test Loss: 0.0090 (Restored weights)
+
+==================================================
+LOO-CV Final Report (Ranking Mode)
+==================================================
+[Save] Results saved to: data/features/2025-12-30_21-32-17/loocv_results.csv
+
+--- Compound Performance Summary ---
+Compound  Pred_Diff_Score  Correct
+     ROT        -0.113373        1
+     ARI        -0.176129        1
+     CAR        -0.186726        1
+     UNC        -0.187246        1
+     LSD        -0.293510        1
+     R10        -0.310280        1
+    Lisu        -0.345859        1
+     BRE        -0.349332        1
+     S10        -0.376998        1
+     S84        -0.475195        1
+[Save] Loss history saved to: data/features/2025-12-30_21-32-17/loocv_losses.json
+
+Retraining on ALL data to inspect learned mask...
+Final Retraining...
+
+>>> Top 15 Features Chosen by Dynamic Mask:
+Rank  | Feature              | Mask Value
+---------------------------------------------
+1     | 6.51_Global_Max      | 0.4367
+2     | Global_Cos_Angle     | 0.4158
+3     | 6.52_Global_Max      | 0.4066
+4     | Lig_H6_Orientation   | 0.4028
+5     | 6.51_Global_Sum      | 0.3992
+6     | 6.52_Global_Norm     | 0.3893
+7     | 6.52_Global_Sum      | 0.3664
+8     | 6.51_Global_Norm     | 0.3616
+9     | Atom8_6.51_Score     | 0.3355
+10    | Atom7_6.51_Score     | 0.3355
+11    | Atom6_6.51_Score     | 0.3355
+12    | Atom5_6.51_Score     | 0.3355
+13    | Atom3_6.51_Score     | 0.3355
+14    | Atom4_6.51_Score     | 0.3355
+15    | Atom1_6.51_Score     | 0.3355
+[Save] Feature importance saved to: data/features/2025-12-30_21-32-17/feature_importance.csv
+
+Model saved.

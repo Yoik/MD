@@ -1,0 +1,110 @@
+PLUMED: PLUMED is starting
+PLUMED: Version: 2.11.0-dev (git: 4649f2b8a) compiled on Aug 10 2025 at 19:49:40
+PLUMED: Please cite these papers when using PLUMED [1][2]
+PLUMED: For further information see the PLUMED web page at http://www.plumed.org
+PLUMED: Root: /home/hongyu/soft/plumed/2.10/lib/plumed
+PLUMED: LibraryPath: /home/hongyu/soft/plumed/2.10/lib/libplumedKernel.so
+PLUMED: For installed feature, see /home/hongyu/soft/plumed/2.10/lib/plumed/src/config/config.txt
+PLUMED: Molecular dynamics engine: gromacs
+PLUMED: Precision of reals: 4
+PLUMED: Running over 1 node
+PLUMED: Number of threads: 1
+PLUMED: Cache line size: 512
+PLUMED: Number of atoms: 233657
+PLUMED: File suffix: 
+PLUMED: FILE: plumed.dat
+PLUMED: Action TORSION
+PLUMED:   with label phi_B
+PLUMED:   between atoms 5745 5747 5750 5751
+PLUMED:   using periodic boundary conditions
+PLUMED: Action COM
+PLUMED:   with label ringB
+PLUMED:   added component to this action: ringB.x 
+PLUMED:   added component to this action: ringB.y 
+PLUMED:   added component to this action: ringB.z 
+PLUMED:   added component to this action: ringB.mass 
+PLUMED:   added component to this action: ringB.charge 
+PLUMED:   of atoms:
+PLUMED:  5750 5751 5753 5755 5759 5757
+PLUMED:   mass weighted
+PLUMED:   broken molecules will be rebuilt assuming atoms are in the proper order
+PLUMED: Action COM
+PLUMED:   with label ringA
+PLUMED:   added component to this action: ringA.x 
+PLUMED:   added component to this action: ringA.y 
+PLUMED:   added component to this action: ringA.z 
+PLUMED:   added component to this action: ringA.mass 
+PLUMED:   added component to this action: ringA.charge 
+PLUMED:   of atoms:
+PLUMED:  5770 5771 5773 5775 5779 5777
+PLUMED:   mass weighted
+PLUMED:   broken molecules will be rebuilt assuming atoms are in the proper order
+PLUMED: Action COM
+PLUMED:   with label ringC
+PLUMED:   added component to this action: ringC.x 
+PLUMED:   added component to this action: ringC.y 
+PLUMED:   added component to this action: ringC.z 
+PLUMED:   added component to this action: ringC.mass 
+PLUMED:   added component to this action: ringC.charge 
+PLUMED:   of atoms:
+PLUMED:  16172 16175 16177 16178 16179 16180
+PLUMED:   mass weighted
+PLUMED:   broken molecules will be rebuilt assuming atoms are in the proper order
+PLUMED: Action DISTANCE
+PLUMED:   with label d_AB
+PLUMED:   between atoms 233659 233658
+PLUMED:   using periodic boundary conditions
+PLUMED: Action DISTANCE
+PLUMED:   with label d_BC
+PLUMED:   between atoms 233658 233660
+PLUMED:   using periodic boundary conditions
+PLUMED: Action OPES_METAD
+PLUMED:   with label opes
+PLUMED:   with arguments : 
+PLUMED:    scalar with label phi_B 
+PLUMED:   added component to this action: opes.bias 
+PLUMED: WARNING for action OPES_METAD with label opes : using TEMP=310 while MD engine uses 310.15
+PLUMED:  
+PLUMED:   added component to this action: opes.rct 
+PLUMED:   added component to this action: opes.zed 
+PLUMED:   added component to this action: opes.neff 
+PLUMED:   added component to this action: opes.nker 
+PLUMED:   temperature = 310
+PLUMED:   beta = 0.387975
+PLUMED:   depositing new kernels with PACE = 500
+PLUMED:   expected BARRIER is 40
+PLUMED:   using target distribution with BIASFACTOR gamma = 15.519
+PLUMED:   kernels have initial SIGMA =  0.15
+PLUMED:   kernels are truncated with KERNELS_CUTOFF = 5.75984
+PLUMED:   the value at cutoff is = 6.25131e-08
+PLUMED:   regularization EPSILON = 6.25131e-08
+PLUMED:   kernels will be compressed when closer than COMPRESSION_THRESHOLD = 1
+PLUMED:   state checkpoints are written on file STATE every 50000 MD steps
+PLUMED:   Bibliography: [3]
+PLUMED: Action PRINT
+PLUMED:   with label @10
+PLUMED:   with stride 500
+PLUMED:   with arguments : 
+PLUMED:    scalar with label phi_B 
+PLUMED:    scalar with label d_AB 
+PLUMED:    scalar with label d_BC 
+PLUMED:    scalar with label opes.bias 
+PLUMED:   on file COLVAR
+PLUMED:   with format  %f
+PLUMED: END FILE: plumed.dat
+PLUMED: Timestep: 0.002000
+PLUMED: KbT: 2.578731
+PLUMED: Relevant bibliography:
+PLUMED:   [1] The PLUMED consortium, Nat. Methods 16, 670 (2019)
+PLUMED:   [2] Tribello, Bonomi, Branduardi, Camilloni, and Bussi, Comput. Phys. Commun. 185, 604 (2014)
+PLUMED:   [3] M. Invernizzi and M. Parrinello, J. Phys. Chem. Lett. 11, 2731-2736 (2020)
+PLUMED: Please read and cite where appropriate!
+PLUMED: Finished setup
+PLUMED:                                               Cycles        Total      Average      Minimum      Maximum
+PLUMED:                                                    1    99.101132    99.101132    99.101132    99.101132
+PLUMED: 1 Prepare dependencies                       4621701     3.864427     0.000001     0.000000     0.000216
+PLUMED: 2 Sharing data                               4621701     6.683159     0.000001     0.000001     0.001281
+PLUMED: 3 Waiting for data                           4621701     8.327253     0.000002    -0.688535     0.000512
+PLUMED: 4 Calculating (forward loop)                 4621701    20.628636     0.000004     0.000002     0.000810
+PLUMED: 5 Applying (backward loop)                   4621701     9.685543     0.000002    -0.531980     0.001407
+PLUMED: 6 Update                                     4621701    28.941382     0.000006    -0.536242     0.001190

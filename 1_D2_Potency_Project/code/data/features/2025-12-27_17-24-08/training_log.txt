@@ -1,0 +1,15 @@
+Random seed set to: 42
+Preparing data...
+Scanning data for 15 compounds...
+  -> Slicing Strategy: Window=100, Stride=20
+Processing Reference Data from dir: data/features/20251115_D2_Dopa_cryoEM_rebuild
+  -> Found 6 reference files.
+  -> Loaded 5011 frames from reference.
+  -> Generated 226 reference slices.
+Split Strategy: Grouped by Compound ID (Slicing Enabled)
+Train: 8 compounds -> 1048 slices
+Test : 3 compounds -> 354 slices
+Total Compounds: 11
+Starting LOO-CV with Dynamic Masking...
+
+>>> Round 1 / 10 | Testing: ARI

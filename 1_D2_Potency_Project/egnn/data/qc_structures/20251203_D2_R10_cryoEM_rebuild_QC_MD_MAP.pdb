@@ -1,0 +1,125 @@
+TITLE     MDANALYSIS FRAME 0: Created by PDBWriter
+CRYST1  119.376  119.376  157.022  90.00  90.00  90.00 P 1           1
+ATOM      1  O1  LIG X1043      58.220  67.980  61.050  1.00  0.00      seg_ O  
+ATOM      2  C1  LIG X1043      57.440  67.170  61.560  1.00  0.00      seg_ C  
+ATOM      3  N1  LIG X1043      57.830  66.640  62.810  1.00  0.00      seg_ N  
+ATOM      4  C2  LIG X1043      56.910  66.040  63.570  1.00  0.00      seg_ C  
+ATOM      5  C3  LIG X1043      57.300  65.630  64.850  1.00  0.00      seg_ C  
+ATOM      6  C4  LIG X1043      56.400  64.860  65.610  1.00  0.00      seg_ C  
+ATOM      7  O2  LIG X1043      56.610  64.640  67.040  1.00  0.00      seg_ O  
+ATOM      8  C5  LIG X1043      57.900  64.970  67.490  1.00  0.00      seg_ C  
+ATOM      9  C6  LIG X1043      57.900  64.300  68.880  1.00  0.00      seg_ C  
+ATOM     10  C7  LIG X1043      59.290  64.490  69.620  1.00  0.00      seg_ C  
+ATOM     11  C8  LIG X1043      59.720  63.390  70.590  1.00  0.00      seg_ C  
+ATOM     12  N2  LIG X1043      61.040  63.480  71.180  1.00  0.00      seg_ N  
+ATOM     13  C9  LIG X1043      61.160  62.660  72.510  1.00  0.00      seg_ C  
+ATOM     14  C10 LIG X1043      62.580  62.870  73.140  1.00  0.00      seg_ C  
+ATOM     15  C11 LIG X1043      62.770  62.090  74.560  1.00  0.00      seg_ C  
+ATOM     16  C12 LIG X1043      64.180  61.800  74.880  1.00  0.67      seg_ C  
+ATOM     17  C13 LIG X1043      64.950  61.780  76.020  1.00  0.81      seg_ C  
+ATOM     18  N3  LIG X1043      66.250  61.430  75.660  1.00  0.75      seg_ N  
+ATOM     19  C14 LIG X1043      66.440  61.550  74.350  1.00  0.66      seg_ C  
+ATOM     20  C15 LIG X1043      65.200  61.880  73.870  1.00  0.54      seg_ C  
+ATOM     21  C16 LIG X1043      65.050  62.250  72.500  1.00  0.48      seg_ C  
+ATOM     22  N4  LIG X1043      63.700  62.500  72.110  1.00  0.00      seg_ N  
+ATOM     23  C17 LIG X1043      63.590  63.170  70.810  1.00  0.00      seg_ C  
+ATOM     24  C18 LIG X1043      62.160  63.010  70.280  1.00  0.00      seg_ C  
+ATOM     25  C19 LIG X1043      66.120  62.020  71.670  1.00  0.33      seg_ C  
+ATOM     26  C20 LIG X1043      67.430  61.930  72.210  1.00  0.73      seg_ C  
+ATOM     27  C21 LIG X1043      67.590  61.610  73.580  1.00  0.95      seg_ C  
+ATOM     28  C22 LIG X1043      55.080  64.520  65.110  1.00  0.00      seg_ C  
+ATOM     29  C23 LIG X1043      54.900  64.820  63.750  1.00  0.00      seg_ C  
+ATOM     30  C24 LIG X1043      55.660  65.700  63.080  1.00  0.00      seg_ C  
+ATOM     31  C25 LIG X1043      55.330  66.020  61.810  1.00  0.00      seg_ C  
+ATOM     32  C26 LIG X1043      56.180  66.730  60.980  1.00  0.00      seg_ C  
+ATOM     33  H1  LIG X1043      58.690  67.070  63.130  1.00  0.00      seg_ H  
+ATOM     34  H2  LIG X1043      58.150  66.120  65.310  1.00  0.00      seg_ H  
+ATOM     35  H3  LIG X1043      58.090  66.060  67.590  1.00  0.00      seg_ H  
+ATOM     36  H4  LIG X1043      58.720  64.500  66.920  1.00  0.00      seg_ H  
+ATOM     37  H5  LIG X1043      57.550  63.260  68.770  1.00  0.00      seg_ H  
+ATOM     38  H6  LIG X1043      57.190  64.800  69.580  1.00  0.00      seg_ H  
+ATOM     39  H7  LIG X1043      59.220  65.400  70.260  1.00  0.00      seg_ H  
+ATOM     40  H8  LIG X1043      60.100  64.480  68.860  1.00  0.00      seg_ H  
+ATOM     41  H9  LIG X1043      59.750  62.380  70.130  1.00  0.00      seg_ H  
+ATOM     42  H10 LIG X1043      59.020  63.360  71.430  1.00  0.00      seg_ H  
+ATOM     43  H11 LIG X1043      61.170  64.460  71.510  1.00  0.00      seg_ H  
+ATOM     44  H12 LIG X1043      61.040  61.600  72.220  1.00  0.00      seg_ H  
+ATOM     45  H13 LIG X1043      60.400  62.980  73.240  1.00  0.00      seg_ H  
+ATOM     46  H14 LIG X1043      62.680  63.960  73.300  1.00  0.00      seg_ H  
+ATOM     47  H15 LIG X1043      62.350  61.060  74.580  1.00  0.00      seg_ H  
+ATOM     48  H16 LIG X1043      62.270  62.690  75.340  1.00  0.00      seg_ H  
+ATOM     49  H17 LIG X1043      64.550  61.870  77.020  1.00  0.00      seg_ H  
+ATOM     50  H18 LIG X1043      66.990  61.180  76.300  1.00  0.00      seg_ H  
+ATOM     51  H19 LIG X1043      64.220  62.890  69.930  1.00  0.00      seg_ H  
+ATOM     52  H20 LIG X1043      63.910  64.220  70.990  1.00  0.00      seg_ H  
+ATOM     53  H21 LIG X1043      62.000  63.620  69.390  1.00  0.00      seg_ H  
+ATOM     54  H22 LIG X1043      61.950  61.970  70.000  1.00  0.00      seg_ H  
+ATOM     55  H23 LIG X1043      66.020  61.980  70.600  1.00  0.00      seg_ H  
+ATOM     56  H24 LIG X1043      68.330  61.880  71.600  1.00  0.00      seg_ H  
+ATOM     57  H25 LIG X1043      68.540  61.370  74.020  1.00  0.00      seg_ H  
+ATOM     58  H26 LIG X1043      54.430  63.960  65.750  1.00  0.00      seg_ H  
+ATOM     59  H27 LIG X1043      53.990  64.510  63.270  1.00  0.00      seg_ H  
+ATOM     60  H28 LIG X1043      54.340  65.820  61.380  1.00  0.00      seg_ H  
+ATOM     61  H29 LIG X1043      55.840  67.140  60.040  1.00  0.00      seg_ H  
+CONECT    1    2
+CONECT    2    1    3   32
+CONECT    3    2    4   33
+CONECT    4    3    5   30
+CONECT    5    4    6   34
+CONECT    6    5    7   28
+CONECT    7    6    8
+CONECT    8    7    9   35   36
+CONECT    9    8   10   37   38
+CONECT   10    9   11   39   40
+CONECT   11   10   12   41   42
+CONECT   12   11   13   24   43
+CONECT   13   12   14   44   45
+CONECT   14   13   15   22   46
+CONECT   15   14   16   47   48
+CONECT   16   15   17   20
+CONECT   17   16   18   49
+CONECT   18   17   19   50
+CONECT   19   18   20   27
+CONECT   20   16   19   21
+CONECT   21   20   22   25
+CONECT   22   14   21   23
+CONECT   23   22   24   51   52
+CONECT   24   12   23   53   54
+CONECT   25   21   26   55
+CONECT   26   25   27   56
+CONECT   27   19   26   57
+CONECT   28    6   29   58
+CONECT   29   28   30   59
+CONECT   30    4   29   31
+CONECT   31   30   32   60
+CONECT   32    2   31   61
+CONECT   33    3
+CONECT   34    5
+CONECT   35    8
+CONECT   36    8
+CONECT   37    9
+CONECT   38    9
+CONECT   39   10
+CONECT   40   10
+CONECT   41   11
+CONECT   42   11
+CONECT   43   12
+CONECT   44   13
+CONECT   45   13
+CONECT   46   14
+CONECT   47   15
+CONECT   48   15
+CONECT   49   17
+CONECT   50   18
+CONECT   51   23
+CONECT   52   23
+CONECT   53   24
+CONECT   54   24
+CONECT   55   25
+CONECT   56   26
+CONECT   57   27
+CONECT   58   28
+CONECT   59   29
+CONECT   60   31
+CONECT   61   32
+END

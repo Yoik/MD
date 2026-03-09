@@ -1,0 +1,17 @@
+{
+  "radius": 2.0,
+  "angle_scale": 20.0,
+  "dist_scale": 2.0,
+  "metrics_file": "/home/hongyu/MD/1_partial/param_runs/run_r2p0_a20p0_d2p0/models/model_metrics.csv",
+  "best_model": "Random Forest",
+  "R2_Train": 0.8680955664657457,
+  "R2_Test": -4450.030592726281,
+  "RMSE_Test": 35.881934575575144,
+  "MAE_Test": 35.22240710709993,
+  "KFold_CV_R2": 0.4195406379526988,
+  "KFold_CV_RMSE": 22.220495103073944,
+  "KFold_CV_MAE": 18.99232247132857,
+  "LOO_R2": 0.4392951799670979,
+  "LOO_RMSE": 21.839111521596525,
+  "LOO_MAE": 18.27461519512856
+}

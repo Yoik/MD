@@ -1,0 +1,78 @@
+PLUMED: PLUMED is starting
+PLUMED: Version: 2.11.0-dev (git: 4649f2b8a) compiled on Aug 10 2025 at 19:49:40
+PLUMED: Please cite these papers when using PLUMED [1][2]
+PLUMED: For further information see the PLUMED web page at http://www.plumed.org
+PLUMED: Root: /home/hongyu/soft/plumed/2.10/lib/plumed
+PLUMED: LibraryPath: /home/hongyu/soft/plumed/2.10/lib/libplumedKernel.so
+PLUMED: For installed feature, see /home/hongyu/soft/plumed/2.10/lib/plumed/src/config/config.txt
+PLUMED: Molecular dynamics engine: gromacs
+PLUMED: Precision of reals: 4
+PLUMED: Running over 1 node
+PLUMED: Number of threads: 1
+PLUMED: Cache line size: 512
+PLUMED: Number of atoms: 233657
+PLUMED: File suffix: 
+PLUMED: FILE: plumed.dat
+PLUMED: Action TORSION
+PLUMED:   with label phi_B
+PLUMED:   between atoms 5745 5747 5750 5751
+PLUMED:   using periodic boundary conditions
+PLUMED: Action COM
+PLUMED:   with label ringB
+PLUMED:   added component to this action: ringB.x 
+PLUMED:   added component to this action: ringB.y 
+PLUMED:   added component to this action: ringB.z 
+PLUMED:   added component to this action: ringB.mass 
+PLUMED:   added component to this action: ringB.charge 
+PLUMED:   of atoms:
+PLUMED:  5750 5751 5753 5755 5759 5757
+PLUMED:   mass weighted
+PLUMED:   broken molecules will be rebuilt assuming atoms are in the proper order
+PLUMED: Action COM
+PLUMED:   with label ringA
+PLUMED:   added component to this action: ringA.x 
+PLUMED:   added component to this action: ringA.y 
+PLUMED:   added component to this action: ringA.z 
+PLUMED:   added component to this action: ringA.mass 
+PLUMED:   added component to this action: ringA.charge 
+PLUMED:   of atoms:
+PLUMED:  5770 5771 5773 5775 5779 5777
+PLUMED:   mass weighted
+PLUMED:   broken molecules will be rebuilt assuming atoms are in the proper order
+PLUMED: Action COM
+PLUMED:   with label ringC
+PLUMED:   added component to this action: ringC.x 
+PLUMED:   added component to this action: ringC.y 
+PLUMED:   added component to this action: ringC.z 
+PLUMED:   added component to this action: ringC.mass 
+PLUMED:   added component to this action: ringC.charge 
+PLUMED:   of atoms:
+PLUMED:  16172 16175 16177 16178 16179 16180
+PLUMED:   mass weighted
+PLUMED:   broken molecules will be rebuilt assuming atoms are in the proper order
+PLUMED: Action DISTANCE
+PLUMED:   with label d_AB
+PLUMED:   between atoms 233659 233658
+PLUMED:   using periodic boundary conditions
+PLUMED: Action DISTANCE
+PLUMED:   with label d_BC
+PLUMED:   between atoms 233658 233660
+PLUMED:   using periodic boundary conditions
+PLUMED: Action OPES_METAD
+PLUMED:   with label opes
+PLUMED:   with arguments : 
+PLUMED:    scalar with label phi_B 
+PLUMED:   added component to this action: opes.bias 
+PLUMED:   multiple time step 500 [3]
+PLUMED: WARNING for action OPES_METAD with label opes : using TEMP=310 while MD engine uses 310.15
+PLUMED:  
+PLUMED: ERROR in input to action OPES_METAD with label opes : cannot understand the following words from the input line : PRINT, ARG=phi_B,d_AB,d_BC,opes.bias, FILE=COLVAR 
+PLUMED:  
+PLUMED: 
+PLUMED: ################################################################################
+PLUMED: 
+PLUMED: (core/Action.cpp:373) void PLMD::Action::error(const string&) const
+PLUMED: ERROR in input to action OPES_METAD with label opes : cannot understand the following words from the input line : PRINT, ARG=phi_B,d_AB,d_BC,opes.bias, FILE=COLVAR
+PLUMED: ################################################################################
+PLUMED:                                               Cycles        Total      Average      Minimum      Maximum
+PLUMED:                                                    1     0.014716     0.014716     0.014716     0.014716

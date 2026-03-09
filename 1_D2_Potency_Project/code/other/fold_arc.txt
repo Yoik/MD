@@ -1,0 +1,35 @@
+D2_Potency_Project/              <-- 项目根目录
+│
+├── data/                        <-- 【数据层】存放所有输入和中间数据
+│   ├── labels.csv               # 实验效能标签 (Compound, Efficacy)
+│   └── features/                # 存放提取好的 .npy (原 results 文件夹)
+│       ├── Dopa/
+│       │   ├── replicate_1/
+│       │   │   └── ..._features.npy
+│       │   └── ...
+│       └── ... (其他化合物)
+│
+├── src/                         <-- 【核心库】存放被调用的类和函数 (不直接运行)
+│   ├── __init__.py              # 必须有，标识为包
+│   ├── model.py                 # 定义 DeepMIL 网络架构 (EfficiencyPredictor)
+│   ├── dataset.py               # 定义数据加载 (prepare_data, TrajectoryDataset)
+│   └── geometry.py              # (可选) 如果特征提取逻辑复杂，可放这里
+│
+├── modules/                     <-- 【遗留模块】您原本的特征提取依赖
+│   ├── __init__.py
+│   ├── geometry.py
+│   └── output_handler.py
+│
+├── saved_models/                <-- 【产出层】存放训练好的模型
+│   ├── best_model.pth           # 最佳模型权重
+│   └── scaler.pkl               # 标准化参数
+│
+├── analysis_results/            <-- 【产出层】存放评估报表和图片
+│   ├── evaluation_report.csv
+│   ├── evaluation_plot.png
+│   └── Dopa_dist.png
+│
+├── 1_extract_features.py        # (原 run_analysis_v2.py) 步骤一：特征提取
+├── 2_train_model.py             # (原 train.py)           步骤二：模型训练
+├── 3_evaluate_all.py            # (原 evaluate_all.py)    步骤三：全集评估
+└── 4_predict_single.py          # (原 predict.py)         步骤四：单样本深挖

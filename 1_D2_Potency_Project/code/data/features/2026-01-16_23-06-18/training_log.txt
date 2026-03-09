@@ -1,0 +1,13 @@
+Random seed set to: 42
+Preparing data...
+Scanning data for 15 compounds...
+  -> Slicing Strategy: Window=100, Stride=20
+Processing Reference Data from dir: data/features/20251115_D2_Dopa_cryoEM_rebuild
+  -> Found 6 reference files.
+  -> Loaded 5011 frames from reference.
+     Pose charmm-gui-6633077180: 86 reference slices
+     Pose charmm-gui-6321110432: 140 reference slices
+Split Strategy: Grouped by Compound ID (Slicing Enabled)
+Train: 8 compounds -> 1135 slices
+Test : 3 compounds -> 369 slices
+[DATA ERROR] all the input array dimensions except for the concatenation axis must match exactly, but along dimension 1, the array at index 0 has size 64 and the array at index 785 has size 62

@@ -1,0 +1,16 @@
+# ================= DEFINITIONS =================
+# 1. B (Phe389) 的变量
+phi_B: TORSION ATOMS=5745,5747,5750,5751
+
+# [修改点] 使用 CENTER (几何中心) 替代 COM (质心)
+ringB: CENTER ATOMS=5750,5751,5753,5755,5759,5757
+
+# 2. W (Trp386) 的侧链吲哚环
+# [修改点] 使用 CENTER 替代 COM
+ringW: CENTER ATOMS=5693,5694,5696,5698,5699,5700,5702,5704,5706
+
+# 3. 计算距离
+dist_BW: DISTANCE ATOMS=ringB,ringW
+
+# ================= OUTPUT =================
+PRINT ARG=phi_B,dist_BW STRIDE=10 FILE=ANALYSIS_BW

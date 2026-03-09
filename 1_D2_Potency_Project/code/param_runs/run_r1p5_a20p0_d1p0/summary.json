@@ -1,0 +1,17 @@
+{
+  "radius": 1.5,
+  "angle_scale": 20.0,
+  "dist_scale": 1.0,
+  "metrics_file": "/home/hongyu/MD/1_partial/param_runs/run_r1p5_a20p0_d1p0/models/model_metrics.csv",
+  "best_model": "Gradient Boosting",
+  "R2_Train": 0.999999999294492,
+  "R2_Test": -667.1330811076427,
+  "RMSE_Test": 13.90199244206192,
+  "MAE_Test": 13.901588899472545,
+  "KFold_CV_R2": 0.6450994578172305,
+  "KFold_CV_RMSE": 17.374853551206176,
+  "KFold_CV_MAE": 16.99175142322861,
+  "LOO_R2": 0.5517706855342961,
+  "LOO_RMSE": 19.52620971579647,
+  "LOO_MAE": 18.63792595721996
+}

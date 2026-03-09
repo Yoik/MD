@@ -1,0 +1,101 @@
+Random seed set to: 42
+Preparing data...
+Scanning data for 15 compounds...
+  -> Slicing Strategy: Window=100, Stride=20
+Processing Reference Data from dir: data/features/20251115_D2_Dopa_cryoEM_rebuild
+  -> Found 6 reference files.
+  -> Loaded 5011 frames from reference.
+     Pose charmm-gui-6633077180: 86 reference slices
+     Pose charmm-gui-6321110432: 140 reference slices
+Split Strategy: Grouped by Compound ID (Slicing Enabled)
+Train: 8 compounds -> 1170 slices
+Test : 3 compounds -> 313 slices
+Reference poses: ['charmm-gui-6633077180', 'charmm-gui-6321110432']
+Total Compounds: 11
+Starting LOO-CV with Dynamic Masking...
+
+>>> Round 1 / 10 | Testing: ARI
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0097 (Restored weights)
+
+>>> Round 2 / 10 | Testing: BRE
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0089 (Restored weights)
+
+>>> Round 3 / 10 | Testing: CAR
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0096 (Restored weights)
+
+>>> Round 4 / 10 | Testing: LSD
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0088 (Restored weights)
+
+>>> Round 5 / 10 | Testing: Lisu
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0086 (Restored weights)
+
+>>> Round 6 / 10 | Testing: R10
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0088 (Restored weights)
+
+>>> Round 7 / 10 | Testing: ROT
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0255 (Restored weights)
+
+>>> Round 8 / 10 | Testing: S10
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0090 (Restored weights)
+
+>>> Round 9 / 10 | Testing: S84
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0089 (Restored weights)
+
+>>> Round 10 / 10 | Testing: UNC
+✓ 配置已加载: config.yaml
+  -> Best Test Loss: 0.0086 (Restored weights)
+
+==================================================
+LOO-CV Final Report (Ranking Mode)
+==================================================
+[Save] Results saved to: data/features/2026-01-16_23-31-49/loocv_results.csv
+
+--- Compound Performance Summary ---
+Compound  Pred_Diff_Score  Correct
+     ROT        -0.385017        0
+     CAR        -0.452940        1
+     UNC        -0.544923        0
+     ARI        -0.553096        1
+    Lisu        -0.633288        1
+     LSD        -0.749180        1
+     BRE        -0.802659        1
+     R10        -0.859554        0
+     S10        -0.995897        1
+     S84        -1.000320        1
+[Save] Loss history saved to: data/features/2026-01-16_23-31-49/loocv_losses.json
+
+Retraining on ALL data to inspect learned mask...
+✓ 配置已加载: config.yaml
+Final Retraining...
+✓ 配置已加载: config.yaml
+
+>>> Top 15 Features Chosen by Dynamic Mask:
+Rank  | Feature              | Mask Value
+---------------------------------------------
+1     | ELF_H6_Axis_Cos      | 0.6720
+2     | ELF_Anisotropy       | 0.6625
+3     | Global_Cos_Angle     | 0.6101
+4     | Lig_H6_Orientation   | 0.5968
+5     | Atom7_6.52_Dist      | 0.5951
+6     | Atom5_6.52_Dist      | 0.5951
+7     | Atom4_6.52_Dist      | 0.5951
+8     | Atom0_6.52_Dist      | 0.5951
+9     | Atom6_6.52_Dist      | 0.5951
+10    | Atom8_6.52_Dist      | 0.5951
+11    | Atom3_6.52_Dist      | 0.5951
+12    | Atom1_6.52_Dist      | 0.5951
+13    | Atom2_6.52_Dist      | 0.5951
+14    | Atom5_6.52_Angle     | 0.5930
+15    | Atom4_6.52_Angle     | 0.5930
+[Save] Feature importance saved to: data/features/2026-01-16_23-31-49/feature_importance.csv
+
+Model saved.

@@ -1,0 +1,174 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                   D2 Potency 项目 - 统一配置系统结构                        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+📦 项目根目录
+│
+├─ 📄 config.yaml ⭐ 核心配置文件
+│  ├─ paths (文件路径)
+│  │  ├─ label_file
+│  │  ├─ result_dir
+│  │  ├─ qc_output_dir
+│  │  ├─ reference_pdb
+│  │  ├─ model_path
+│  │  └─ scaler_path
+│  │
+│  ├─ data (数据处理)
+│  │  ├─ integration_radius
+│  │  ├─ pocket_atom_num
+│  │  ├─ input_dim_features
+│  │  ├─ input_dim_eval
+│  │  └─ standard_sequence
+│  │
+│  ├─ residues (蛋白质残基)
+│  │  ├─ phe_residues
+│  │  ├─ obp_residues
+│  │  └─ plane_residues
+│  │
+│  ├─ training (训练参数)
+│  │  ├─ learning_rate
+│  │  ├─ dropout_rate
+│  │  ├─ weight_decay
+│  │  ├─ num_epochs
+│  │  ├─ batch_size
+│  │  ├─ l1_lambda
+│  │  ├─ window_size
+│  │  └─ stride
+│  │
+│  ├─ evaluation (评估)
+│  │  └─ samples_per_level
+│  │
+│  └─ plotting (绘图)
+│     ├─ use_agg_backend
+│     ├─ style
+│     └─ dpi
+│
+├─ 📁 src/
+│  └─ 📄 config.py ⭐ 配置管理模块
+│     ├─ class Config
+│     │  ├─ load() - 加载 YAML
+│     │  ├─ get() - 获取配置
+│     │  ├─ get_path() - 获取路径
+│     │  ├─ get_int() - 获取整数
+│     │  ├─ get_float() - 获取浮点
+│     │  ├─ get_list() - 获取列表
+│     │  └─ get_bool() - 获取布尔
+│     │
+│     └─ init_config() - 便捷初始化函数
+│
+├─ 📁 scripts/
+│  └─ 📄 migrate_to_config.py - 自动分析工具
+│
+├─ 📚 文档文件
+│  ├─ CONFIG_USAGE.md ⭐⭐⭐ 详细使用说明
+│  ├─ CONFIG_QUICK_REF.md ⭐⭐ 快速参考
+│  ├─ MIGRATION_GUIDE.md ⭐⭐ 改造步骤
+│  └─ CONFIG_DEPLOY_SUMMARY.md - 部署总结
+│
+└─ 📄 主要脚本（改造候选）
+   ├─ 2_train_model.py (12 个配置参数)
+   ├─ 1_extract_features.py (3 个配置参数)
+   ├─ 3_evaluate_all.py (6 个配置参数)
+   ├─ 8_generate_efficacy_map.py (5 个配置参数)
+   └─ 其他脚本...
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                            使用流程图                                      ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+【脚本改造】
+  1. 导入配置
+     from src.config import init_config
+     config = init_config()
+  
+  2. 替换参数
+     OLD: LEARNING_RATE = 0.001
+     NEW: LEARNING_RATE = config.get_float("training.learning_rate")
+  
+  3. 测试运行
+     python 2_train_model.py
+     ✓ 成功！
+
+【日常使用】
+  想改学习率？
+     ↓
+  编辑 config.yaml (第 23 行)
+     ↓
+  learning_rate: 0.0005
+     ↓
+  所有脚本自动生效！
+
+
+【配置查询流程】
+  需要某个参数
+     ↓
+  查看 config.yaml 或 CONFIG_QUICK_REF.md
+     ↓
+  找到配置键，如 "training.learning_rate"
+     ↓
+  在脚本中使用: config.get_float("training.learning_rate")
+     ↓
+  完成！
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                          关键特性总结                                      ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+✅ 中央配置管理      - 所有参数在一个 YAML 文件中
+✅ 类型安全获取      - get_int(), get_float(), get_path() 等
+✅ 单例模式          - 全局唯一配置实例，无重复加载
+✅ 嵌套键支持        - 支持 "paths.model_path" 这样的点号访问
+✅ 默认值处理        - 参数不存在时返回默认值
+✅ 自动发现机制      - 支持多个配置文件位置
+✅ 零侵入改造        - 现有脚本只需加几行代码
+✅ 易于扩展          - 可轻松添加新配置项
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                        快速查看已部署文件                                  ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+✓ config.yaml                     - 主配置文件
+✓ src/config.py                   - 配置模块
+✓ CONFIG_USAGE.md                 - 使用文档
+✓ CONFIG_QUICK_REF.md             - 速查表
+✓ MIGRATION_GUIDE.md              - 改造指南
+✓ CONFIG_DEPLOY_SUMMARY.md        - 部署总结
+✓ CONFIG_STRUCTURE.txt            - 本文件
+✓ scripts/migrate_to_config.py    - 分析工具
+
+总计：8 个新增文件，全部就绪！
+
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                          下一步行动                                        ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+【立即开始】
+  1. 阅读 CONFIG_QUICK_REF.md (2 分钟)
+  2. 选择一个脚本进行改造 (5 分钟)
+  3. 测试改造后的脚本 (1 分钟)
+  4. 修改 config.yaml 验证生效 (1 分钟)
+  
+  总耗时：10 分钟！
+
+
+【推荐改造顺序】
+  第一步: 2_train_model.py (训练脚本 - 参数最多)
+  第二步: 3_evaluate_all.py (评估脚本)
+  第三步: 1_extract_features.py (特征提取)
+  第四步: 8_generate_efficacy_map.py (图谱生成)
+  第五步: 其他脚本 (按需)
+
+
+【遇到问题】
+  → 查看 CONFIG_USAGE.md FAQ 部分
+  → 运行诊断命令：
+    python -c "from src.config import init_config; init_config()"
+  → 检查 config.yaml 是否在项目根目录
+
+
+════════════════════════════════════════════════════════════════════════════
+                         🎉 配置系统已就绪！
+════════════════════════════════════════════════════════════════════════════

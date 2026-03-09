@@ -1,0 +1,588 @@
+* place dummy atoms at the center of each rings
+*
+
+set ncycles = 395
+
+read sequence POL @NCYCLES
+generate DUM warn
+
+coor set xdir    6.180 ydir  -15.818 zdir  -22.140 sele segid dum .and. resi 1 end
+coor set xdir    9.486 ydir  -15.676 zdir  -14.530 sele segid dum .and. resi 2 end
+coor set xdir   19.631 ydir   -9.564 zdir  -17.752 sele segid dum .and. resi 3 end
+coor set xdir   15.064 ydir   -5.830 zdir  -14.393 sele segid dum .and. resi 4 end
+coor set xdir   -7.255 ydir   -7.972 zdir   17.376 sele segid dum .and. resi 5 end
+coor set xdir    1.339 ydir  -12.264 zdir   -9.167 sele segid dum .and. resi 6 end
+coor set xdir    2.008 ydir  -12.349 zdir  -18.997 sele segid dum .and. resi 7 end
+coor set xdir   -3.744 ydir   -7.075 zdir  -20.279 sele segid dum .and. resi 8 end
+coor set xdir   -3.212 ydir   -7.988 zdir  -18.403 sele segid dum .and. resi 9 end
+coor set xdir   -3.083 ydir  -13.206 zdir  -20.014 sele segid dum .and. resi 10 end
+coor set xdir   -6.604 ydir  -11.524 zdir  -16.553 sele segid dum .and. resi 11 end
+coor set xdir   -3.473 ydir   12.297 zdir   18.738 sele segid dum .and. resi 12 end
+coor set xdir   -4.296 ydir    8.487 zdir   27.584 sele segid dum .and. resi 13 end
+coor set xdir   -4.471 ydir    2.029 zdir   22.609 sele segid dum .and. resi 14 end
+coor set xdir  -17.511 ydir   -2.107 zdir   28.540 sele segid dum .and. resi 15 end
+coor set xdir   -9.673 ydir   -3.977 zdir    4.692 sele segid dum .and. resi 16 end
+coor set xdir   -8.469 ydir   -4.759 zdir    3.098 sele segid dum .and. resi 17 end
+coor set xdir  -15.956 ydir   -2.301 zdir   -4.220 sele segid dum .and. resi 18 end
+coor set xdir  -14.393 ydir    3.693 zdir   -9.914 sele segid dum .and. resi 19 end
+coor set xdir  -18.855 ydir   -0.122 zdir  -11.341 sele segid dum .and. resi 20 end
+coor set xdir   -6.325 ydir   11.365 zdir  -17.209 sele segid dum .and. resi 21 end
+coor set xdir   -9.110 ydir    5.890 zdir  -10.581 sele segid dum .and. resi 22 end
+coor set xdir  -11.666 ydir   11.033 zdir   -6.095 sele segid dum .and. resi 23 end
+coor set xdir    1.586 ydir    9.643 zdir   -1.054 sele segid dum .and. resi 24 end
+coor set xdir   -0.322 ydir   13.837 zdir   -3.321 sele segid dum .and. resi 25 end
+coor set xdir   -4.083 ydir    9.441 zdir    3.140 sele segid dum .and. resi 26 end
+coor set xdir    3.120 ydir   12.717 zdir    3.303 sele segid dum .and. resi 27 end
+coor set xdir    3.045 ydir    8.093 zdir   12.964 sele segid dum .and. resi 28 end
+coor set xdir    9.390 ydir   15.017 zdir   18.293 sele segid dum .and. resi 29 end
+coor set xdir   21.287 ydir   10.366 zdir   46.747 sele segid dum .and. resi 30 end
+coor set xdir   28.034 ydir   -0.310 zdir   38.060 sele segid dum .and. resi 31 end
+coor set xdir   35.274 ydir   -5.695 zdir   47.729 sele segid dum .and. resi 32 end
+coor set xdir   31.673 ydir   19.396 zdir   36.634 sele segid dum .and. resi 33 end
+coor set xdir   36.658 ydir    7.706 zdir   46.756 sele segid dum .and. resi 34 end
+coor set xdir   36.433 ydir   12.025 zdir   48.774 sele segid dum .and. resi 35 end
+coor set xdir   23.994 ydir   13.241 zdir   43.314 sele segid dum .and. resi 36 end
+coor set xdir   29.727 ydir   12.583 zdir   50.644 sele segid dum .and. resi 37 end
+coor set xdir   28.541 ydir    5.855 zdir   50.345 sele segid dum .and. resi 38 end
+coor set xdir   26.376 ydir    3.310 zdir   47.138 sele segid dum .and. resi 39 end
+coor set xdir   16.922 ydir   -7.858 zdir   43.219 sele segid dum .and. resi 40 end
+coor set xdir   17.632 ydir   -4.854 zdir   36.819 sele segid dum .and. resi 41 end
+coor set xdir   13.609 ydir    1.176 zdir   39.655 sele segid dum .and. resi 42 end
+coor set xdir   12.613 ydir    5.945 zdir   38.197 sele segid dum .and. resi 43 end
+coor set xdir   27.311 ydir    2.611 zdir   24.016 sele segid dum .and. resi 44 end
+coor set xdir   30.584 ydir    9.527 zdir   21.566 sele segid dum .and. resi 45 end
+coor set xdir   22.834 ydir   25.784 zdir   32.263 sele segid dum .and. resi 46 end
+coor set xdir   18.706 ydir   17.916 zdir   29.263 sele segid dum .and. resi 47 end
+coor set xdir   35.902 ydir   12.727 zdir   35.678 sele segid dum .and. resi 48 end
+coor set xdir   44.624 ydir   -3.039 zdir   27.162 sele segid dum .and. resi 49 end
+coor set xdir    2.932 ydir    5.617 zdir    3.348 sele segid dum .and. resi 50 end
+coor set xdir    3.333 ydir    2.595 zdir   -1.218 sele segid dum .and. resi 51 end
+coor set xdir    2.742 ydir    1.973 zdir   -3.184 sele segid dum .and. resi 52 end
+coor set xdir    9.140 ydir    7.749 zdir   -4.659 sele segid dum .and. resi 53 end
+coor set xdir    0.649 ydir    7.624 zdir   -4.792 sele segid dum .and. resi 54 end
+coor set xdir   12.498 ydir    7.926 zdir  -18.035 sele segid dum .and. resi 55 end
+coor set xdir    9.651 ydir    4.358 zdir  -19.486 sele segid dum .and. resi 56 end
+coor set xdir    4.561 ydir    4.721 zdir  -13.698 sele segid dum .and. resi 57 end
+coor set xdir   11.229 ydir    6.489 zdir   -8.782 sele segid dum .and. resi 58 end
+coor set xdir    8.382 ydir   -4.256 zdir  -10.075 sele segid dum .and. resi 59 end
+coor set xdir    7.384 ydir   -5.956 zdir   -9.225 sele segid dum .and. resi 60 end
+coor set xdir    4.802 ydir   -4.539 zdir   12.095 sele segid dum .and. resi 61 end
+coor set xdir   12.775 ydir   -0.457 zdir   15.486 sele segid dum .and. resi 62 end
+coor set xdir    3.885 ydir   -8.415 zdir   15.949 sele segid dum .and. resi 63 end
+coor set xdir    7.285 ydir  -12.128 zdir   13.534 sele segid dum .and. resi 64 end
+coor set xdir   14.370 ydir  -20.301 zdir   16.175 sele segid dum .and. resi 65 end
+coor set xdir    6.978 ydir   -7.726 zdir    8.248 sele segid dum .and. resi 66 end
+coor set xdir    3.450 ydir   -3.633 zdir   -6.712 sele segid dum .and. resi 67 end
+coor set xdir    6.393 ydir   16.907 zdir  -18.595 sele segid dum .and. resi 68 end
+coor set xdir    0.818 ydir   19.180 zdir  -11.386 sele segid dum .and. resi 69 end
+coor set xdir    0.727 ydir    7.694 zdir  -11.569 sele segid dum .and. resi 70 end
+coor set xdir    2.734 ydir    4.620 zdir   -8.493 sele segid dum .and. resi 71 end
+coor set xdir   21.075 ydir   20.991 zdir   29.908 sele segid dum .and. resi 72 end
+coor set xdir   35.042 ydir   16.199 zdir   26.372 sele segid dum .and. resi 73 end
+coor set xdir   20.421 ydir    3.945 zdir   30.865 sele segid dum .and. resi 74 end
+coor set xdir   18.939 ydir   -0.691 zdir   52.017 sele segid dum .and. resi 75 end
+coor set xdir   26.962 ydir   -3.193 zdir   52.870 sele segid dum .and. resi 76 end
+coor set xdir   34.178 ydir   16.647 zdir   33.817 sele segid dum .and. resi 77 end
+coor set xdir   40.320 ydir   -4.298 zdir   43.745 sele segid dum .and. resi 78 end
+coor set xdir   26.851 ydir    8.866 zdir   43.702 sele segid dum .and. resi 79 end
+coor set xdir   -8.286 ydir    1.246 zdir    3.152 sele segid dum .and. resi 80 end
+coor set xdir   -2.546 ydir   -5.934 zdir  -13.019 sele segid dum .and. resi 81 end
+coor set xdir   -2.764 ydir  -11.591 zdir  -12.261 sele segid dum .and. resi 82 end
+coor set xdir   -3.113 ydir  -13.028 zdir  -13.817 sele segid dum .and. resi 83 end
+coor set xdir    9.078 ydir  -16.491 zdir    6.090 sele segid dum .and. resi 84 end
+coor set xdir   11.998 ydir  -19.540 zdir  -22.420 sele segid dum .and. resi 85 end
+coor set xdir  -50.619 ydir  -28.294 zdir   -9.632 sele segid dum .and. resi 86 end
+coor set xdir  -51.058 ydir  -28.584 zdir  -15.920 sele segid dum .and. resi 87 end
+coor set xdir  -50.166 ydir  -28.272 zdir  -13.657 sele segid dum .and. resi 88 end
+coor set xdir  -51.594 ydir  -28.768 zdir  -11.587 sele segid dum .and. resi 89 end
+coor set xdir   32.403 ydir  -49.543 zdir  -14.063 sele segid dum .and. resi 90 end
+coor set xdir   32.957 ydir  -48.519 zdir  -11.787 sele segid dum .and. resi 91 end
+coor set xdir   33.877 ydir  -49.853 zdir  -10.253 sele segid dum .and. resi 92 end
+coor set xdir   31.640 ydir  -48.235 zdir  -15.976 sele segid dum .and. resi 93 end
+coor set xdir   45.688 ydir  -46.062 zdir  -15.861 sele segid dum .and. resi 94 end
+coor set xdir   44.785 ydir  -47.871 zdir   -9.794 sele segid dum .and. resi 95 end
+coor set xdir   45.532 ydir  -46.570 zdir  -11.447 sele segid dum .and. resi 96 end
+coor set xdir   44.806 ydir  -47.098 zdir  -13.815 sele segid dum .and. resi 97 end
+coor set xdir   15.859 ydir   43.563 zdir  -10.056 sele segid dum .and. resi 98 end
+coor set xdir   16.812 ydir   42.396 zdir  -11.731 sele segid dum .and. resi 99 end
+coor set xdir   17.410 ydir   43.663 zdir  -13.925 sele segid dum .and. resi 100 end
+coor set xdir   18.269 ydir   42.594 zdir  -15.984 sele segid dum .and. resi 101 end
+coor set xdir   40.111 ydir    3.422 zdir  -15.875 sele segid dum .and. resi 102 end
+coor set xdir   41.211 ydir    4.430 zdir  -13.900 sele segid dum .and. resi 103 end
+coor set xdir   41.395 ydir    5.672 zdir   -9.908 sele segid dum .and. resi 104 end
+coor set xdir   40.351 ydir    4.343 zdir  -11.475 sele segid dum .and. resi 105 end
+coor set xdir   13.417 ydir   38.595 zdir  -13.799 sele segid dum .and. resi 106 end
+coor set xdir   13.481 ydir   39.379 zdir   -9.792 sele segid dum .and. resi 107 end
+coor set xdir   12.341 ydir   38.476 zdir  -11.505 sele segid dum .and. resi 108 end
+coor set xdir   12.195 ydir   37.697 zdir  -15.841 sele segid dum .and. resi 109 end
+coor set xdir   28.603 ydir   -7.488 zdir  -15.912 sele segid dum .and. resi 110 end
+coor set xdir   29.845 ydir   -6.512 zdir  -13.979 sele segid dum .and. resi 111 end
+coor set xdir   30.225 ydir   -5.618 zdir   -9.983 sele segid dum .and. resi 112 end
+coor set xdir   29.136 ydir   -6.773 zdir  -11.569 sele segid dum .and. resi 113 end
+coor set xdir   -8.303 ydir   -2.136 zdir   47.970 sele segid dum .and. resi 114 end
+coor set xdir   -6.189 ydir   -4.703 zdir   53.937 sele segid dum .and. resi 115 end
+coor set xdir   -4.741 ydir   -3.751 zdir   52.656 sele segid dum .and. resi 116 end
+coor set xdir   -6.562 ydir   18.233 zdir   39.140 sele segid dum .and. resi 117 end
+coor set xdir   -9.854 ydir   15.938 zdir   43.796 sele segid dum .and. resi 118 end
+coor set xdir   -5.472 ydir   19.917 zdir   45.231 sele segid dum .and. resi 119 end
+coor set xdir  -16.607 ydir    7.877 zdir   45.789 sele segid dum .and. resi 120 end
+coor set xdir  -15.596 ydir    9.626 zdir   40.840 sele segid dum .and. resi 121 end
+coor set xdir   -7.464 ydir   11.361 zdir   40.035 sele segid dum .and. resi 122 end
+coor set xdir  -11.368 ydir    2.206 zdir   46.570 sele segid dum .and. resi 123 end
+coor set xdir   -8.681 ydir  -10.778 zdir   49.088 sele segid dum .and. resi 124 end
+coor set xdir    4.406 ydir    3.006 zdir   51.924 sele segid dum .and. resi 125 end
+coor set xdir   15.195 ydir   11.520 zdir   61.461 sele segid dum .and. resi 126 end
+coor set xdir    8.017 ydir    1.836 zdir   48.516 sele segid dum .and. resi 127 end
+coor set xdir   -1.238 ydir   -4.254 zdir   45.693 sele segid dum .and. resi 128 end
+coor set xdir    1.741 ydir   12.279 zdir   47.190 sele segid dum .and. resi 129 end
+coor set xdir   14.322 ydir   14.907 zdir   56.358 sele segid dum .and. resi 130 end
+coor set xdir   21.661 ydir   14.033 zdir   63.008 sele segid dum .and. resi 131 end
+coor set xdir   22.597 ydir    3.893 zdir   60.934 sele segid dum .and. resi 132 end
+coor set xdir   22.931 ydir   10.892 zdir   54.903 sele segid dum .and. resi 133 end
+coor set xdir   25.851 ydir   15.987 zdir   53.354 sele segid dum .and. resi 134 end
+coor set xdir   14.032 ydir   18.849 zdir   51.993 sele segid dum .and. resi 135 end
+coor set xdir   20.936 ydir    7.121 zdir   52.497 sele segid dum .and. resi 136 end
+coor set xdir   11.855 ydir   -4.633 zdir   36.126 sele segid dum .and. resi 137 end
+coor set xdir    5.058 ydir    7.718 zdir   37.984 sele segid dum .and. resi 138 end
+coor set xdir    6.501 ydir    0.687 zdir   27.322 sele segid dum .and. resi 139 end
+coor set xdir   -4.639 ydir   14.713 zdir   34.847 sele segid dum .and. resi 140 end
+coor set xdir    5.964 ydir   14.243 zdir   42.026 sele segid dum .and. resi 141 end
+coor set xdir   10.616 ydir    4.844 zdir   52.173 sele segid dum .and. resi 142 end
+coor set xdir   17.478 ydir    5.534 zdir   56.337 sele segid dum .and. resi 143 end
+coor set xdir   -2.734 ydir  -10.994 zdir   45.648 sele segid dum .and. resi 144 end
+coor set xdir   16.022 ydir    2.020 zdir   58.983 sele segid dum .and. resi 145 end
+coor set xdir   -2.211 ydir    3.715 zdir   -6.487 sele segid dum .and. resi 146 end
+coor set xdir   -2.684 ydir    4.482 zdir   -8.410 sele segid dum .and. resi 147 end
+coor set xdir   -1.395 ydir    2.799 zdir   -8.531 sele segid dum .and. resi 148 end
+coor set xdir    0.044 ydir    0.891 zdir   -8.577 sele segid dum .and. resi 149 end
+coor set xdir    3.390 ydir   -2.734 zdir  -16.624 sele segid dum .and. resi 150 end
+coor set xdir    2.880 ydir   -2.748 zdir  -19.001 sele segid dum .and. resi 151 end
+coor set xdir  -24.245 ydir  -29.357 zdir   13.746 sele segid dum .and. resi 152 end
+coor set xdir  -24.539 ydir  -30.569 zdir   15.883 sele segid dum .and. resi 153 end
+coor set xdir  -23.660 ydir  -29.256 zdir    9.640 sele segid dum .and. resi 154 end
+coor set xdir  -24.061 ydir  -30.497 zdir   11.486 sele segid dum .and. resi 155 end
+coor set xdir   -7.215 ydir   15.696 zdir    9.608 sele segid dum .and. resi 156 end
+coor set xdir   -8.498 ydir   16.091 zdir   11.459 sele segid dum .and. resi 157 end
+coor set xdir   -7.330 ydir   16.121 zdir   13.726 sele segid dum .and. resi 158 end
+coor set xdir   -8.501 ydir   16.291 zdir   15.880 sele segid dum .and. resi 159 end
+coor set xdir   -7.565 ydir  -53.934 zdir   15.797 sele segid dum .and. resi 160 end
+coor set xdir   -8.831 ydir  -53.175 zdir   13.768 sele segid dum .and. resi 161 end
+coor set xdir   -9.278 ydir  -52.277 zdir    9.756 sele segid dum .and. resi 162 end
+coor set xdir   -7.907 ydir  -53.009 zdir   11.390 sele segid dum .and. resi 163 end
+coor set xdir   22.663 ydir  -22.722 zdir   13.886 sele segid dum .and. resi 164 end
+coor set xdir   22.333 ydir  -22.987 zdir    9.713 sele segid dum .and. resi 165 end
+coor set xdir   23.749 ydir  -23.099 zdir   11.561 sele segid dum .and. resi 166 end
+coor set xdir   23.937 ydir  -22.504 zdir   16.007 sele segid dum .and. resi 167 end
+coor set xdir  -32.461 ydir   26.375 zdir   15.858 sele segid dum .and. resi 168 end
+coor set xdir  -30.983 ydir   26.223 zdir   13.894 sele segid dum .and. resi 169 end
+coor set xdir  -30.423 ydir   25.815 zdir    9.850 sele segid dum .and. resi 170 end
+coor set xdir  -31.904 ydir   25.957 zdir   11.500 sele segid dum .and. resi 171 end
+coor set xdir   17.912 ydir   44.467 zdir    9.879 sele segid dum .and. resi 172 end
+coor set xdir   16.307 ydir   44.206 zdir   11.490 sele segid dum .and. resi 173 end
+coor set xdir   16.854 ydir   44.917 zdir   13.922 sele segid dum .and. resi 174 end
+coor set xdir   15.398 ydir   44.531 zdir   15.859 sele segid dum .and. resi 175 end
+coor set xdir   13.927 ydir   52.529 zdir   15.930 sele segid dum .and. resi 176 end
+coor set xdir   14.452 ydir   53.288 zdir   13.617 sele segid dum .and. resi 177 end
+coor set xdir   14.563 ydir   52.877 zdir    9.474 sele segid dum .and. resi 178 end
+coor set xdir   13.857 ydir   52.027 zdir   11.417 sele segid dum .and. resi 179 end
+coor set xdir  -20.840 ydir    7.431 zdir   15.906 sele segid dum .and. resi 180 end
+coor set xdir  -20.264 ydir    6.448 zdir   13.677 sele segid dum .and. resi 181 end
+coor set xdir  -20.691 ydir    7.648 zdir   11.444 sele segid dum .and. resi 182 end
+coor set xdir  -20.180 ydir    6.537 zdir    9.537 sele segid dum .and. resi 183 end
+coor set xdir  -33.851 ydir   -9.233 zdir    9.719 sele segid dum .and. resi 184 end
+coor set xdir  -33.948 ydir   -9.685 zdir   13.894 sele segid dum .and. resi 185 end
+coor set xdir  -34.903 ydir  -10.466 zdir   16.003 sele segid dum .and. resi 186 end
+coor set xdir  -34.912 ydir  -10.087 zdir   11.560 sele segid dum .and. resi 187 end
+coor set xdir   44.065 ydir   -6.226 zdir   15.920 sele segid dum .and. resi 188 end
+coor set xdir   44.766 ydir   -6.858 zdir   13.657 sele segid dum .and. resi 189 end
+coor set xdir   44.358 ydir   -6.663 zdir    9.632 sele segid dum .and. resi 190 end
+coor set xdir   43.641 ydir   -5.848 zdir   11.587 sele segid dum .and. resi 191 end
+coor set xdir   26.297 ydir  -37.566 zdir   15.983 sele segid dum .and. resi 192 end
+coor set xdir   27.090 ydir  -36.531 zdir   13.844 sele segid dum .and. resi 193 end
+coor set xdir   26.958 ydir  -36.350 zdir    9.652 sele segid dum .and. resi 194 end
+coor set xdir   25.886 ydir  -36.934 zdir   11.603 sele segid dum .and. resi 195 end
+coor set xdir   -3.770 ydir  -32.004 zdir   13.697 sele segid dum .and. resi 196 end
+coor set xdir   -2.814 ydir  -32.707 zdir   11.508 sele segid dum .and. resi 197 end
+coor set xdir   -3.795 ydir  -31.999 zdir    9.591 sele segid dum .and. resi 198 end
+coor set xdir   -2.776 ydir  -32.642 zdir   15.880 sele segid dum .and. resi 199 end
+coor set xdir   25.705 ydir   36.372 zdir   10.975 sele segid dum .and. resi 200 end
+coor set xdir   25.244 ydir   38.264 zdir   12.124 sele segid dum .and. resi 201 end
+coor set xdir   24.406 ydir   38.081 zdir   14.556 sele segid dum .and. resi 202 end
+coor set xdir   23.846 ydir   39.995 zdir   16.052 sele segid dum .and. resi 203 end
+coor set xdir  -18.166 ydir  -16.349 zdir   16.014 sele segid dum .and. resi 204 end
+coor set xdir  -16.913 ydir  -15.193 zdir   14.191 sele segid dum .and. resi 205 end
+coor set xdir  -15.909 ydir  -14.727 zdir   10.270 sele segid dum .and. resi 206 end
+coor set xdir  -17.346 ydir  -15.685 zdir   11.742 sele segid dum .and. resi 207 end
+coor set xdir    0.099 ydir   51.702 zdir   15.907 sele segid dum .and. resi 208 end
+coor set xdir   -0.040 ydir   50.322 zdir   13.792 sele segid dum .and. resi 209 end
+coor set xdir   -0.936 ydir   49.942 zdir    9.700 sele segid dum .and. resi 210 end
+coor set xdir   -0.812 ydir   51.329 zdir   11.527 sele segid dum .and. resi 211 end
+coor set xdir  -33.515 ydir   -3.540 zdir    9.770 sele segid dum .and. resi 212 end
+coor set xdir  -34.706 ydir   -2.676 zdir   11.470 sele segid dum .and. resi 213 end
+coor set xdir  -35.399 ydir   -2.674 zdir   15.909 sele segid dum .and. resi 214 end
+coor set xdir  -34.120 ydir   -3.419 zdir   13.875 sele segid dum .and. resi 215 end
+coor set xdir   23.324 ydir  -14.179 zdir   16.015 sele segid dum .and. resi 216 end
+coor set xdir   21.796 ydir  -13.916 zdir   14.021 sele segid dum .and. resi 217 end
+coor set xdir   21.228 ydir  -13.925 zdir    9.844 sele segid dum .and. resi 218 end
+coor set xdir   22.521 ydir  -14.511 zdir   11.656 sele segid dum .and. resi 219 end
+coor set xdir  -44.713 ydir  -30.295 zdir    9.843 sele segid dum .and. resi 220 end
+coor set xdir  -46.090 ydir  -30.349 zdir   11.607 sele segid dum .and. resi 221 end
+coor set xdir  -45.239 ydir  -29.493 zdir   13.851 sele segid dum .and. resi 222 end
+coor set xdir  -46.699 ydir  -29.484 zdir   15.892 sele segid dum .and. resi 223 end
+coor set xdir  -26.078 ydir  -23.123 zdir   16.137 sele segid dum .and. resi 224 end
+coor set xdir  -26.056 ydir  -23.068 zdir   13.658 sele segid dum .and. resi 225 end
+coor set xdir  -26.368 ydir  -24.818 zdir    9.908 sele segid dum .and. resi 226 end
+coor set xdir  -26.624 ydir  -25.089 zdir   12.110 sele segid dum .and. resi 227 end
+coor set xdir  -13.995 ydir   51.200 zdir   11.489 sele segid dum .and. resi 228 end
+coor set xdir  -14.141 ydir   50.542 zdir   15.887 sele segid dum .and. resi 229 end
+coor set xdir  -14.151 ydir   49.627 zdir   13.538 sele segid dum .and. resi 230 end
+coor set xdir  -14.306 ydir   50.268 zdir    9.441 sele segid dum .and. resi 231 end
+coor set xdir  -53.803 ydir   11.759 zdir   15.995 sele segid dum .and. resi 232 end
+coor set xdir  -53.491 ydir   12.448 zdir   13.643 sele segid dum .and. resi 233 end
+coor set xdir  -54.943 ydir   11.673 zdir   11.707 sele segid dum .and. resi 234 end
+coor set xdir  -54.473 ydir   12.288 zdir    9.581 sele segid dum .and. resi 235 end
+coor set xdir  -52.927 ydir  -43.037 zdir   15.893 sele segid dum .and. resi 236 end
+coor set xdir  -51.834 ydir  -43.390 zdir   13.614 sele segid dum .and. resi 237 end
+coor set xdir  -51.696 ydir  -45.183 zdir    9.903 sele segid dum .and. resi 238 end
+coor set xdir  -52.979 ydir  -44.629 zdir   11.672 sele segid dum .and. resi 239 end
+coor set xdir   48.688 ydir  -47.882 zdir    9.695 sele segid dum .and. resi 240 end
+coor set xdir   49.744 ydir  -47.413 zdir   15.977 sele segid dum .and. resi 241 end
+coor set xdir   49.551 ydir  -48.352 zdir   13.722 sele segid dum .and. resi 242 end
+coor set xdir   48.997 ydir  -46.901 zdir   11.713 sele segid dum .and. resi 243 end
+coor set xdir   35.236 ydir   51.001 zdir   13.727 sele segid dum .and. resi 244 end
+coor set xdir   35.403 ydir   49.417 zdir   11.735 sele segid dum .and. resi 245 end
+coor set xdir   35.108 ydir   50.233 zdir    9.630 sele segid dum .and. resi 246 end
+coor set xdir   35.930 ydir   50.287 zdir   16.071 sele segid dum .and. resi 247 end
+coor set xdir  -41.896 ydir   38.225 zdir   15.897 sele segid dum .and. resi 248 end
+coor set xdir  -41.375 ydir   39.159 zdir   13.596 sele segid dum .and. resi 249 end
+coor set xdir  -41.718 ydir   37.828 zdir   11.441 sele segid dum .and. resi 250 end
+coor set xdir  -41.123 ydir   38.720 zdir    9.428 sele segid dum .and. resi 251 end
+coor set xdir  -28.642 ydir   48.730 zdir   15.856 sele segid dum .and. resi 252 end
+coor set xdir  -27.326 ydir   48.584 zdir   13.766 sele segid dum .and. resi 253 end
+coor set xdir  -26.943 ydir   48.158 zdir    9.764 sele segid dum .and. resi 254 end
+coor set xdir  -28.329 ydir   48.656 zdir   11.451 sele segid dum .and. resi 255 end
+coor set xdir   11.032 ydir   32.873 zdir   14.171 sele segid dum .and. resi 256 end
+coor set xdir   12.685 ydir   33.864 zdir   10.512 sele segid dum .and. resi 257 end
+coor set xdir   11.682 ydir   32.242 zdir   11.805 sele segid dum .and. resi 258 end
+coor set xdir   10.205 ydir   31.297 zdir   15.918 sele segid dum .and. resi 259 end
+coor set xdir  -42.336 ydir  -16.347 zdir    9.709 sele segid dum .and. resi 260 end
+coor set xdir  -42.408 ydir  -15.356 zdir   11.726 sele segid dum .and. resi 261 end
+coor set xdir  -41.551 ydir  -15.728 zdir   16.000 sele segid dum .and. resi 262 end
+coor set xdir  -41.266 ydir  -16.537 zdir   13.698 sele segid dum .and. resi 263 end
+coor set xdir   46.467 ydir   22.207 zdir   16.134 sele segid dum .and. resi 264 end
+coor set xdir   45.940 ydir   22.710 zdir   13.816 sele segid dum .and. resi 265 end
+coor set xdir   45.410 ydir   21.566 zdir    9.837 sele segid dum .and. resi 266 end
+coor set xdir   45.680 ydir   20.902 zdir   12.014 sele segid dum .and. resi 267 end
+coor set xdir  -31.797 ydir   18.099 zdir   13.483 sele segid dum .and. resi 268 end
+coor set xdir  -30.958 ydir   18.062 zdir    9.457 sele segid dum .and. resi 269 end
+coor set xdir  -30.093 ydir   18.192 zdir   11.579 sele segid dum .and. resi 270 end
+coor set xdir  -31.026 ydir   18.110 zdir   15.895 sele segid dum .and. resi 271 end
+coor set xdir   16.994 ydir   26.800 zdir   15.838 sele segid dum .and. resi 272 end
+coor set xdir   15.809 ydir   27.182 zdir   13.657 sele segid dum .and. resi 273 end
+coor set xdir   15.510 ydir   26.941 zdir    9.562 sele segid dum .and. resi 274 end
+coor set xdir   16.703 ydir   26.379 zdir   11.414 sele segid dum .and. resi 275 end
+coor set xdir  -53.467 ydir   50.042 zdir    9.918 sele segid dum .and. resi 276 end
+coor set xdir  -51.847 ydir   49.990 zdir   11.499 sele segid dum .and. resi 277 end
+coor set xdir  -50.920 ydir   49.808 zdir   15.893 sele segid dum .and. resi 278 end
+coor set xdir  -52.585 ydir   49.614 zdir   13.972 sele segid dum .and. resi 279 end
+coor set xdir   37.026 ydir   42.154 zdir   16.023 sele segid dum .and. resi 280 end
+coor set xdir   35.921 ydir   40.709 zdir   14.311 sele segid dum .and. resi 281 end
+coor set xdir   34.103 ydir   40.121 zdir   10.665 sele segid dum .and. resi 282 end
+coor set xdir   35.387 ydir   41.460 zdir   11.954 sele segid dum .and. resi 283 end
+coor set xdir   54.132 ydir  -26.505 zdir   15.865 sele segid dum .and. resi 284 end
+coor set xdir   52.583 ydir  -27.050 zdir   13.991 sele segid dum .and. resi 285 end
+coor set xdir   51.495 ydir  -26.965 zdir   10.052 sele segid dum .and. resi 286 end
+coor set xdir   53.163 ydir  -26.698 zdir   11.588 sele segid dum .and. resi 287 end
+coor set xdir   13.182 ydir  -48.756 zdir    9.733 sele segid dum .and. resi 288 end
+coor set xdir   13.902 ydir  -48.533 zdir   16.023 sele segid dum .and. resi 289 end
+coor set xdir   12.866 ydir  -48.727 zdir   13.793 sele segid dum .and. resi 290 end
+coor set xdir   14.277 ydir  -48.657 zdir   11.668 sele segid dum .and. resi 291 end
+coor set xdir  -40.173 ydir   22.034 zdir   13.691 sele segid dum .and. resi 292 end
+coor set xdir  -39.231 ydir   21.110 zdir   11.445 sele segid dum .and. resi 293 end
+coor set xdir  -39.871 ydir   22.104 zdir    9.496 sele segid dum .and. resi 294 end
+coor set xdir  -39.549 ydir   21.143 zdir   15.920 sele segid dum .and. resi 295 end
+coor set xdir   -3.540 ydir  -41.427 zdir    9.640 sele segid dum .and. resi 296 end
+coor set xdir   -2.482 ydir  -40.665 zdir   11.486 sele segid dum .and. resi 297 end
+coor set xdir   -3.009 ydir  -41.693 zdir   13.746 sele segid dum .and. resi 298 end
+coor set xdir   -2.054 ydir  -40.891 zdir   15.883 sele segid dum .and. resi 299 end
+coor set xdir  -45.261 ydir  -37.256 zdir   15.929 sele segid dum .and. resi 300 end
+coor set xdir  -45.258 ydir  -38.174 zdir   13.610 sele segid dum .and. resi 301 end
+coor set xdir  -45.282 ydir  -37.723 zdir    9.457 sele segid dum .and. resi 302 end
+coor set xdir  -45.027 ydir  -36.760 zdir   11.511 sele segid dum .and. resi 303 end
+coor set xdir   25.502 ydir   29.009 zdir   -9.918 sele segid dum .and. resi 304 end
+coor set xdir   26.636 ydir   30.168 zdir  -11.499 sele segid dum .and. resi 305 end
+coor set xdir   27.178 ydir   30.942 zdir  -15.893 sele segid dum .and. resi 306 end
+coor set xdir   25.842 ydir   29.929 zdir  -13.972 sele segid dum .and. resi 307 end
+coor set xdir  -23.152 ydir   22.215 zdir  -16.133 sele segid dum .and. resi 308 end
+coor set xdir  -22.723 ydir   21.607 zdir  -13.780 sele segid dum .and. resi 309 end
+coor set xdir  -22.935 ydir   22.281 zdir   -9.792 sele segid dum .and. resi 310 end
+coor set xdir  -23.938 ydir   22.551 zdir  -11.772 sele segid dum .and. resi 311 end
+coor set xdir   46.078 ydir  -39.990 zdir  -14.129 sele segid dum .and. resi 312 end
+coor set xdir   47.228 ydir  -40.816 zdir  -10.191 sele segid dum .and. resi 313 end
+coor set xdir   46.464 ydir  -39.281 zdir  -11.686 sele segid dum .and. resi 314 end
+coor set xdir   45.137 ydir  -38.429 zdir  -15.876 sele segid dum .and. resi 315 end
+coor set xdir  -54.088 ydir   43.018 zdir  -15.944 sele segid dum .and. resi 316 end
+coor set xdir  -55.457 ydir   42.087 zdir  -14.115 sele segid dum .and. resi 317 end
+coor set xdir  -56.154 ydir   40.905 zdir  -10.252 sele segid dum .and. resi 318 end
+coor set xdir  -54.776 ydir   42.044 zdir  -11.650 sele segid dum .and. resi 319 end
+coor set xdir   40.134 ydir  -35.699 zdir  -10.088 sele segid dum .and. resi 320 end
+coor set xdir   38.388 ydir  -35.587 zdir  -11.582 sele segid dum .and. resi 321 end
+coor set xdir   37.277 ydir  -35.464 zdir  -15.934 sele segid dum .and. resi 322 end
+coor set xdir   38.923 ydir  -35.732 zdir  -14.092 sele segid dum .and. resi 323 end
+coor set xdir   24.982 ydir   48.027 zdir  -15.988 sele segid dum .and. resi 324 end
+coor set xdir   24.910 ydir   49.271 zdir  -13.784 sele segid dum .and. resi 325 end
+coor set xdir   23.129 ydir   50.122 zdir  -10.158 sele segid dum .and. resi 326 end
+coor set xdir   23.086 ydir   48.847 zdir  -12.003 sele segid dum .and. resi 327 end
+coor set xdir   50.049 ydir   29.164 zdir  -16.072 sele segid dum .and. resi 328 end
+coor set xdir   50.378 ydir   29.355 zdir  -13.578 sele segid dum .and. resi 329 end
+coor set xdir   49.800 ydir   27.878 zdir   -9.774 sele segid dum .and. resi 330 end
+coor set xdir   49.588 ydir   27.499 zdir  -11.992 sele segid dum .and. resi 331 end
+coor set xdir  -25.578 ydir   37.276 zdir   -9.672 sele segid dum .and. resi 332 end
+coor set xdir  -24.587 ydir   38.779 zdir  -15.935 sele segid dum .and. resi 333 end
+coor set xdir  -25.070 ydir   37.514 zdir  -13.843 sele segid dum .and. resi 334 end
+coor set xdir  -25.259 ydir   38.593 zdir  -11.514 sele segid dum .and. resi 335 end
+coor set xdir  -44.291 ydir   -5.098 zdir  -14.392 sele segid dum .and. resi 336 end
+coor set xdir  -44.928 ydir   -4.243 zdir  -12.074 sele segid dum .and. resi 337 end
+coor set xdir  -43.258 ydir   -3.385 zdir  -10.792 sele segid dum .and. resi 338 end
+coor set xdir  -46.008 ydir   -6.010 zdir  -15.992 sele segid dum .and. resi 339 end
+coor set xdir   12.939 ydir   20.113 zdir   -9.540 sele segid dum .and. resi 340 end
+coor set xdir   12.664 ydir   21.216 zdir  -11.515 sele segid dum .and. resi 341 end
+coor set xdir   13.080 ydir   19.971 zdir  -13.735 sele segid dum .and. resi 342 end
+coor set xdir   13.228 ydir   21.097 zdir  -16.004 sele segid dum .and. resi 343 end
+coor set xdir   -7.179 ydir  -31.711 zdir  -15.956 sele segid dum .and. resi 344 end
+coor set xdir   -6.143 ydir  -33.258 zdir  -14.268 sele segid dum .and. resi 345 end
+coor set xdir   -5.033 ydir  -34.117 zdir  -10.395 sele segid dum .and. resi 346 end
+coor set xdir   -6.072 ydir  -32.697 zdir  -11.810 sele segid dum .and. resi 347 end
+coor set xdir  -24.330 ydir  -31.624 zdir  -11.280 sele segid dum .and. resi 348 end
+coor set xdir  -26.231 ydir  -30.962 zdir  -12.304 sele segid dum .and. resi 349 end
+coor set xdir  -28.056 ydir  -29.896 zdir  -16.148 sele segid dum .and. resi 350 end
+coor set xdir  -26.108 ydir  -30.629 zdir  -14.821 sele segid dum .and. resi 351 end
+coor set xdir  -37.397 ydir  -33.014 zdir   -9.815 sele segid dum .and. resi 352 end
+coor set xdir  -36.475 ydir  -34.292 zdir  -11.464 sele segid dum .and. resi 353 end
+coor set xdir  -35.862 ydir  -34.525 zdir  -15.875 sele segid dum .and. resi 354 end
+coor set xdir  -36.395 ydir  -33.292 zdir  -13.805 sele segid dum .and. resi 355 end
+coor set xdir   38.139 ydir  -43.322 zdir  -15.860 sele segid dum .and. resi 356 end
+coor set xdir   37.586 ydir  -42.363 zdir  -13.684 sele segid dum .and. resi 357 end
+coor set xdir   37.816 ydir  -42.177 zdir   -9.617 sele segid dum .and. resi 358 end
+coor set xdir   38.363 ydir  -43.312 zdir  -11.460 sele segid dum .and. resi 359 end
+coor set xdir   43.358 ydir   49.747 zdir  -10.120 sele segid dum .and. resi 360 end
+coor set xdir   41.725 ydir   49.965 zdir  -11.604 sele segid dum .and. resi 361 end
+coor set xdir   42.241 ydir   49.546 zdir  -14.090 sele segid dum .and. resi 362 end
+coor set xdir   40.553 ydir   49.762 zdir  -15.931 sele segid dum .and. resi 363 end
+coor set xdir  -42.363 ydir  -39.235 zdir  -15.975 sele segid dum .and. resi 364 end
+coor set xdir  -42.452 ydir  -40.099 zdir  -13.596 sele segid dum .and. resi 365 end
+coor set xdir  -42.441 ydir  -39.592 zdir   -9.449 sele segid dum .and. resi 366 end
+coor set xdir  -42.458 ydir  -38.623 zdir  -11.473 sele segid dum .and. resi 367 end
+coor set xdir  -38.615 ydir  -13.189 zdir  -10.210 sele segid dum .and. resi 368 end
+coor set xdir  -39.813 ydir  -12.239 zdir  -11.941 sele segid dum .and. resi 369 end
+coor set xdir  -39.544 ydir  -10.808 zdir  -16.127 sele segid dum .and. resi 370 end
+coor set xdir  -38.730 ydir  -12.157 zdir  -14.275 sele segid dum .and. resi 371 end
+coor set xdir  -34.511 ydir  -43.563 zdir  -16.020 sele segid dum .and. resi 372 end
+coor set xdir  -33.917 ydir  -43.337 zdir  -13.601 sele segid dum .and. resi 373 end
+coor set xdir  -34.340 ydir  -44.524 zdir   -9.596 sele segid dum .and. resi 374 end
+coor set xdir  -34.582 ydir  -45.015 zdir  -11.822 sele segid dum .and. resi 375 end
+coor set xdir   39.095 ydir  -53.201 zdir  -14.080 sele segid dum .and. resi 376 end
+coor set xdir   39.639 ydir  -54.209 zdir  -10.180 sele segid dum .and. resi 377 end
+coor set xdir   40.484 ydir  -53.137 zdir  -11.980 sele segid dum .and. resi 378 end
+coor set xdir   39.497 ydir  -51.737 zdir  -16.006 sele segid dum .and. resi 379 end
+coor set xdir   31.511 ydir   41.708 zdir  -10.429 sele segid dum .and. resi 380 end
+coor set xdir   33.129 ydir   44.487 zdir  -15.925 sele segid dum .and. resi 381 end
+coor set xdir   31.843 ydir   43.328 zdir  -14.175 sele segid dum .and. resi 382 end
+coor set xdir   32.753 ydir   42.934 zdir  -11.837 sele segid dum .and. resi 383 end
+coor set xdir   49.211 ydir  -17.325 zdir  -13.632 sele segid dum .and. resi 384 end
+coor set xdir   50.558 ydir  -16.764 zdir  -11.509 sele segid dum .and. resi 385 end
+coor set xdir   49.747 ydir  -17.429 zdir   -9.530 sele segid dum .and. resi 386 end
+coor set xdir   50.132 ydir  -16.748 zdir  -15.910 sele segid dum .and. resi 387 end
+coor set xdir  -11.742 ydir   49.114 zdir  -13.731 sele segid dum .and. resi 388 end
+coor set xdir  -11.972 ydir   49.533 zdir   -9.722 sele segid dum .and. resi 389 end
+coor set xdir  -10.598 ydir   49.226 zdir  -11.459 sele segid dum .and. resi 390 end
+coor set xdir  -10.539 ydir   48.577 zdir  -15.880 sele segid dum .and. resi 391 end
+coor set xdir   -8.457 ydir  -22.416 zdir  -15.889 sele segid dum .and. resi 392 end
+coor set xdir   -9.235 ydir  -23.439 zdir  -13.782 sele segid dum .and. resi 393 end
+coor set xdir   -9.027 ydir  -23.759 zdir   -9.607 sele segid dum .and. resi 394 end
+coor set xdir   -8.529 ydir  -22.539 zdir  -11.434 sele segid dum .and. resi 395 end
+
+scalar wmain set 0
+scalar wmain set 1.0 sele segid PROA .and. resi 3 end
+scalar wmain set 1.0 sele segid PROA .and. resi 5 end
+scalar wmain set 1.0 sele segid PROA .and. resi 7 end
+scalar wmain set 1.0 sele segid PROA .and. resi 8 end
+scalar wmain set 1.0 sele segid PROA .and. resi 42 end
+scalar wmain set 1.0 sele segid PROA .and. resi 60 end
+scalar wmain set 1.0 sele segid PROA .and. resi 64 end
+scalar wmain set 1.0 sele segid PROA .and. resi 71 end
+scalar wmain set 1.0 sele segid PROA .and. resi 73 end
+scalar wmain set 1.0 sele segid PROA .and. resi 77 end
+scalar wmain set 1.0 sele segid PROA .and. resi 104 end
+scalar wmain set 1.0 sele segid PROA .and. resi 110 end
+scalar wmain set 1.0 sele segid PROA .and. resi 113 end
+scalar wmain set 1.0 sele segid PROA .and. resi 117 end
+scalar wmain set 1.0 sele segid PROA .and. resi 131 end
+scalar wmain set 1.0 sele segid PROA .and. resi 135 end
+scalar wmain set 1.0 sele segid PROA .and. resi 140 end
+scalar wmain set 1.0 sele segid PROA .and. resi 143 end
+scalar wmain set 1.0 sele segid PROA .and. resi 158 end
+scalar wmain set 1.0 sele segid PROA .and. resi 160 end
+scalar wmain set 1.0 sele segid PROA .and. resi 163 end
+scalar wmain set 1.0 sele segid PROA .and. resi 169 end
+scalar wmain set 1.0 sele segid PROA .and. resi 170 end
+scalar wmain set 1.0 sele segid PROA .and. resi 172 end
+scalar wmain set 1.0 sele segid PROA .and. resi 173 end
+scalar wmain set 1.0 sele segid PROA .and. resi 180 end
+scalar wmain set 1.0 sele segid PROA .and. resi 184 end
+scalar wmain set 1.0 sele segid PROA .and. resi 203 end
+scalar wmain set 1.0 sele segid PROA .and. resi 210 end
+scalar wmain set 1.0 sele segid PROA .and. resi 217 end
+scalar wmain set 1.0 sele segid PROA .and. resi 235 end
+scalar wmain set 1.0 sele segid PROA .and. resi 260 end
+scalar wmain set 1.0 sele segid PROA .and. resi 261 end
+scalar wmain set 1.0 sele segid PROA .and. resi 266 end
+scalar wmain set 1.0 sele segid PROA .and. resi 268 end
+scalar wmain set 1.0 sele segid PROA .and. resi 270 end
+scalar wmain set 1.0 sele segid PROA .and. resi 271 end
+scalar wmain set 1.0 sele segid PROA .and. resi 279 end
+scalar wmain set 1.0 sele segid PROA .and. resi 281 end
+scalar wmain set 1.0 sele segid PROA .and. resi 283 end
+scalar wmain set 1.0 sele segid PROA .and. resi 284 end
+scalar wmain set 1.0 sele segid PROA .and. resi 290 end
+scalar wmain set 1.0 sele segid PROA .and. resi 293 end
+scalar wmain set 1.0 sele segid PROA .and. resi 301 end
+scalar wmain set 1.0 sele segid PROA .and. resi 306 end
+scalar wmain set 1.0 sele segid PROA .and. resi 312 end
+scalar wmain set 1.0 sele segid PROA .and. resi 318 end
+scalar wmain set 1.0 sele segid PROA .and. resi 353 end
+scalar wmain set 1.0 sele segid PROA .and. resi 357 end
+scalar wmain set 1.0 sele segid PROA .and. resi 359 end
+scalar wmain set 1.0 sele segid PROA .and. resi 361 end
+scalar wmain set 1.0 sele segid PROA .and. resi 375 end
+scalar wmain set 1.0 sele segid PROA .and. resi 376 end
+scalar wmain set 1.0 sele segid PROA .and. resi 379 end
+scalar wmain set 1.0 sele segid PROA .and. resi 382 end
+scalar wmain set 1.0 sele segid PROA .and. resi 384 end
+scalar wmain set 1.0 sele segid PROA .and. resi 397 end
+scalar wmain set 1.0 sele segid PROA .and. resi 400 end
+scalar wmain set 1.0 sele segid PROA .and. resi 404 end
+scalar wmain set 1.0 sele segid PROA .and. resi 408 end
+scalar wmain set 1.0 sele segid PROA .and. resi 413 end
+scalar wmain set 1.0 sele segid PROA .and. resi 394 end
+scalar wmain set 1.0 sele segid PROA .and. resi 387 end
+scalar wmain set 1.0 sele segid PROA .and. resi 370 end
+scalar wmain set 1.0 sele segid PROA .and. resi 369 end
+scalar wmain set 1.0 sele segid PROA .and. resi 364 end
+scalar wmain set 1.0 sele segid PROA .and. resi 360 end
+scalar wmain set 1.0 sele segid PROA .and. resi 305 end
+scalar wmain set 1.0 sele segid PROA .and. resi 296 end
+scalar wmain set 1.0 sele segid PROA .and. resi 287 end
+scalar wmain set 1.0 sele segid PROA .and. resi 274 end
+scalar wmain set 1.0 sele segid PROA .and. resi 273 end
+scalar wmain set 1.0 sele segid PROA .and. resi 234 end
+scalar wmain set 1.0 sele segid PROA .and. resi 218 end
+scalar wmain set 1.0 sele segid PROA .and. resi 206 end
+scalar wmain set 1.0 sele segid PROA .and. resi 78 end
+scalar wmain set 1.0 sele segid PROA .and. resi 81 end
+scalar wmain set 1.0 sele segid PROA .and. resi 61 end
+scalar wmain set 1.0 sele segid PROA .and. resi 21 end
+scalar wmain set 1.0 sele segid PROA .and. resi 4 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 202 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 203 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 204 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 205 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 206 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 207 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 208 end
+scalar wmain set 1.0 sele segid PROB .and. resi 82 end
+scalar wmain set 1.0 sele segid PROB .and. resi 78 end
+scalar wmain set 1.0 sele segid PROB .and. resi 58 end
+scalar wmain set 1.0 sele segid PROB .and. resi 56 end
+scalar wmain set 1.0 sele segid PROB .and. resi 39 end
+scalar wmain set 1.0 sele segid PROB .and. resi 55 end
+scalar wmain set 1.0 sele segid PROB .and. resi 62 end
+scalar wmain set 1.0 sele segid PROB .and. resi 63 end
+scalar wmain set 1.0 sele segid PROB .and. resi 66 end
+scalar wmain set 1.0 sele segid PROB .and. resi 80 end
+scalar wmain set 1.0 sele segid PROB .and. resi 90 end
+scalar wmain set 1.0 sele segid PROB .and. resi 97 end
+scalar wmain set 1.0 sele segid PROB .and. resi 107 end
+scalar wmain set 1.0 sele segid PROB .and. resi 116 end
+scalar wmain set 1.0 sele segid PROB .and. resi 124 end
+scalar wmain set 1.0 sele segid PROB .and. resi 131 end
+scalar wmain set 1.0 sele segid PROB .and. resi 139 end
+scalar wmain set 1.0 sele segid PROB .and. resi 145 end
+scalar wmain set 1.0 sele segid PROB .and. resi 147 end
+scalar wmain set 1.0 sele segid PROB .and. resi 150 end
+scalar wmain set 1.0 sele segid PROB .and. resi 153 end
+scalar wmain set 1.0 sele segid PROB .and. resi 159 end
+scalar wmain set 1.0 sele segid PROB .and. resi 171 end
+scalar wmain set 1.0 sele segid PROB .and. resi 176 end
+scalar wmain set 1.0 sele segid PROB .and. resi 210 end
+scalar wmain set 1.0 sele segid PROB .and. resi 192 end
+scalar wmain set 1.0 sele segid PROB .and. resi 178 end
+scalar wmain set 1.0 sele segid PROB .and. resi 164 end
+scalar wmain set 1.0 sele segid PROB .and. resi 144 end
+scalar wmain set 1.0 sele segid PROB .and. resi 115 end
+scalar wmain set 1.0 sele segid PROB .and. resi 101 end
+scalar wmain set 1.0 sele segid HETA .and. resi 1 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 1 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 2 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 3 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 4 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 5 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 6 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 7 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 8 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 9 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 10 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 11 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 12 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 13 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 14 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 15 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 16 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 17 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 18 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 19 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 20 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 21 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 22 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 23 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 24 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 25 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 26 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 27 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 28 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 29 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 30 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 31 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 32 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 33 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 34 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 35 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 36 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 37 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 38 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 179 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 180 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 181 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 182 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 183 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 184 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 185 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 186 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 187 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 188 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 189 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 190 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 191 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 192 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 193 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 194 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 195 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 196 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 197 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 198 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 199 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 200 end
+scalar wmain set 1.0 sele segid MEMB .and. resi 201 end
+
+return
+

@@ -1,0 +1,103 @@
+TITLE     MDANALYSIS FRAME 0: Created by PDBWriter
+CRYST1  120.323  120.323  149.814  90.00  90.00  90.00 P 1           1
+ATOM      1  C1  7LD X1010      65.490  57.450  74.390  1.00  0.52      seg_ C  
+ATOM      2  N1  7LD X1010      65.470  57.830  75.740  1.00  0.49      seg_ N  
+ATOM      3  O   7LD X1010      61.540  58.070  68.530  1.00  0.00      seg_ O  
+ATOM      4  C2  7LD X1010      65.040  57.090  71.630  1.00  0.67      seg_ C  
+ATOM      5  N2  7LD X1010      61.310  60.530  72.160  1.00  0.00      seg_ N  
+ATOM      6  C3  7LD X1010      64.500  58.170  73.760  1.00  0.51      seg_ C  
+ATOM      7  N3  7LD X1010      61.060  59.890  67.420  1.00  0.00      seg_ N  
+ATOM      8  C4  7LD X1010      66.290  56.600  73.690  1.00  0.89      seg_ C  
+ATOM      9  C5  7LD X1010      66.120  56.470  72.300  1.00  0.82      seg_ C  
+ATOM     10  C6  7LD X1010      64.170  57.950  72.390  1.00  0.45      seg_ C  
+ATOM     11  C7  7LD X1010      63.840  58.980  74.770  1.00  0.70      seg_ C  
+ATOM     12  C8  7LD X1010      64.420  58.680  75.990  1.00  0.78      seg_ C  
+ATOM     13  C9  7LD X1010      63.070  58.750  71.840  1.00  0.00      seg_ C  
+ATOM     14  C10 7LD X1010      63.020  59.000  70.460  1.00  0.00      seg_ C  
+ATOM     15  C11 7LD X1010      62.090  59.350  72.850  1.00  0.00      seg_ C  
+ATOM     16  C12 7LD X1010      60.110  60.990  72.930  1.00  0.00      seg_ C  
+ATOM     17  C13 7LD X1010      60.810  60.230  70.840  1.00  0.00      seg_ C  
+ATOM     18  C14 7LD X1010      62.010  59.920  69.790  1.00  0.00      seg_ C  
+ATOM     19  C15 7LD X1010      62.700  59.810  74.230  1.00  0.00      seg_ C  
+ATOM     20  C16 7LD X1010      61.470  59.260  68.560  1.00  0.00      seg_ C  
+ATOM     21  C17 7LD X1010      60.230  59.120  66.530  1.00  0.00      seg_ C  
+ATOM     22  C18 7LD X1010      58.710  59.510  66.550  1.00  0.00      seg_ C  
+ATOM     23  C19 7LD X1010      61.660  61.120  66.970  1.00  0.00      seg_ C  
+ATOM     24  C20 7LD X1010      63.060  61.070  66.370  1.00  0.00      seg_ C  
+ATOM     25  H1  7LD X1010      65.980  57.270  76.410  1.00  0.00      seg_ H  
+ATOM     26  H2  7LD X1010      64.900  56.790  70.600  1.00  0.00      seg_ H  
+ATOM     27  H3  7LD X1010      62.000  61.290  72.030  1.00  0.00      seg_ H  
+ATOM     28  H4  7LD X1010      67.070  56.070  74.220  1.00  0.00      seg_ H  
+ATOM     29  H5  7LD X1010      66.730  55.790  71.730  1.00  0.00      seg_ H  
+ATOM     30  H6  7LD X1010      64.150  58.980  76.990  1.00  0.00      seg_ H  
+ATOM     31  H7  7LD X1010      63.800  58.730  69.730  1.00  0.00      seg_ H  
+ATOM     32  H8  7LD X1010      61.300  58.570  72.940  1.00  0.00      seg_ H  
+ATOM     33  H9  7LD X1010      60.440  61.200  73.970  1.00  0.00      seg_ H  
+ATOM     34  H10 7LD X1010      59.450  60.110  72.790  1.00  0.00      seg_ H  
+ATOM     35  H11 7LD X1010      59.710  61.840  72.330  1.00  0.00      seg_ H  
+ATOM     36  H12 7LD X1010      60.390  61.190  70.500  1.00  0.00      seg_ H  
+ATOM     37  H13 7LD X1010      60.020  59.480  70.990  1.00  0.00      seg_ H  
+ATOM     38  H14 7LD X1010      62.550  60.840  69.470  1.00  0.00      seg_ H  
+ATOM     39  H15 7LD X1010      63.100  60.820  74.030  1.00  0.00      seg_ H  
+ATOM     40  H16 7LD X1010      61.890  59.940  74.980  1.00  0.00      seg_ H  
+ATOM     41  H17 7LD X1010      60.240  58.020  66.680  1.00  0.00      seg_ H  
+ATOM     42  H18 7LD X1010      60.780  59.150  65.560  1.00  0.00      seg_ H  
+ATOM     43  H19 7LD X1010      58.510  60.560  66.250  1.00  0.00      seg_ H  
+ATOM     44  H20 7LD X1010      58.310  59.420  67.590  1.00  0.00      seg_ H  
+ATOM     45  H21 7LD X1010      58.080  58.760  66.040  1.00  0.00      seg_ H  
+ATOM     46  H22 7LD X1010      61.580  61.940  67.710  1.00  0.00      seg_ H  
+ATOM     47  H23 7LD X1010      60.990  61.490  66.170  1.00  0.00      seg_ H  
+ATOM     48  H24 7LD X1010      63.660  60.680  67.220  1.00  0.00      seg_ H  
+ATOM     49  H25 7LD X1010      63.410  61.980  65.830  1.00  0.00      seg_ H  
+ATOM     50  H26 7LD X1010      63.170  60.300  65.570  1.00  0.00      seg_ H  
+CONECT    1    2    6    8
+CONECT    2    1   12   25
+CONECT    3   20
+CONECT    4    9   10   26
+CONECT    5   15   16   17   27
+CONECT    6    1   10   11
+CONECT    7   20   21   23
+CONECT    8    1    9   28
+CONECT    9    4    8   29
+CONECT   10    4    6   13
+CONECT   11    6   12   19
+CONECT   12    2   11   30
+CONECT   13   10   14   15
+CONECT   14   13   18   31
+CONECT   15    5   13   19   32
+CONECT   16    5   33   34   35
+CONECT   17    5   18   36   37
+CONECT   18   14   17   20   38
+CONECT   19   11   15   39   40
+CONECT   20    3    7   18
+CONECT   21    7   22   41   42
+CONECT   22   21   43   44   45
+CONECT   23    7   24   46   47
+CONECT   24   23   48   49   50
+CONECT   25    2
+CONECT   26    4
+CONECT   27    5
+CONECT   28    8
+CONECT   29    9
+CONECT   30   12
+CONECT   31   14
+CONECT   32   15
+CONECT   33   16
+CONECT   34   16
+CONECT   35   16
+CONECT   36   17
+CONECT   37   17
+CONECT   38   18
+CONECT   39   19
+CONECT   40   19
+CONECT   41   21
+CONECT   42   21
+CONECT   43   22
+CONECT   44   22
+CONECT   45   22
+CONECT   46   23
+CONECT   47   23
+CONECT   48   24
+CONECT   49   24
+CONECT   50   24
+END

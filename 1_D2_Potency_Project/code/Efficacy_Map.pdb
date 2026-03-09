@@ -1,0 +1,20 @@
+REMARK   EFFICACY DISTRIBUTION MAP
+REMARK   CHAIN A: HIGH SCORE (>90)
+REMARK   CHAIN B: MED  SCORE (60-90)
+REMARK   CHAIN C: LOW  SCORE (<60)
+REMARK   B-FACTOR COLUMN = PREDICTED SCORE
+ATOM      1  CA  REF Z  1      59.200  56.430  86.700  1.00  0.00           C
+ATOM      2  CA  REF Z  2      57.270  59.770  87.310  1.00  0.00           C
+ATOM      3  CA  REF Z  3      59.850  59.640  92.040  1.00  0.00           C
+ATOM      4  CA  REF Z  4      56.850  61.680  93.240  1.00  0.00           C
+ATOM      5  CA  REF Z  5      56.840  68.180  81.310  1.00  0.00           C
+ATOM      6  CA  REF Z  6      54.440  67.180  86.590  1.00  0.00           C
+ATOM      7  CA  REF Z  7      57.690  69.200  87.430  1.00  0.00           C
+ATOM      8  CA  REF Z  8      57.140  66.460  91.610  1.00  0.00           C
+ATOM      9  CA  REF Z  9      67.650  66.230  91.970  1.00  0.00           C
+ATOM     10  CA  REF Z 10      67.810  66.720  86.230  1.00  0.00           C
+ATOM     11  CA  REF Z 11      64.610  68.890  86.800  1.00  0.00           C
+ATOM     12  CA  REF Z 12      64.660  68.360  81.660  1.00  0.00           C
+ATOM     13  CA  REF Z 13      69.200  60.450  85.680  1.00  0.00           C
+ATOM     14  CA  REF Z 14      68.430  57.720  91.250  1.00  0.00           C
+END

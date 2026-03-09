@@ -1,0 +1,74 @@
+#!/bin/csh
+# 接收批量脚本传入的目录作为输入目录
+if ( $#argv < 1 ) then
+    echo "用法: ./README <replicate目录>"
+    exit 1
+endif
+
+set input_dir = $argv[1]
+
+set init        = ${input_dir}/step5_input
+set rest_prefix = ${input_dir}/step5_input
+set mini_prefix = ${input_dir}/step6.0_minimization
+set equi_prefix = ${input_dir}/step6.%d_equilibration
+set prod_prefix = ${input_dir}/step7_production
+set prod_step   = ${input_dir}/step7
+
+# Minimization
+if ( -e ${mini_prefix}.gro ) then
+    echo "Skip minimization, already done."
+else if ( -e ${mini_prefix}.cpt ) then
+    echo "Continue minimization from checkpoint."
+    gmx mdrun -v -deffnm ${mini_prefix} -cpi ${mini_prefix}.cpt -append
+else
+    gmx grompp -f ${mini_prefix}.mdp -o ${mini_prefix}.tpr -c ${init}.gro -r ${rest_prefix}.gro -p ${input_dir}/topol.top -n ${input_dir}/index.ndx
+    gmx mdrun -v -deffnm ${mini_prefix}
+endif
+
+# Equilibration
+set cnt    = 1
+set cntmax = 6
+
+while ( ${cnt} <= ${cntmax} )
+    @ pcnt = ${cnt} - 1
+    set istep = `printf ${equi_prefix} ${cnt}`
+    set pstep = `printf ${equi_prefix} ${pcnt}`
+    if ( ${cnt} == 1 ) set pstep = ${mini_prefix}
+
+    if ( -e ${istep}.gro ) then
+        echo "Skip ${istep}, already done."
+    else if ( -e ${istep}.cpt ) then
+        echo "Continue ${istep} from checkpoint."
+        gmx mdrun -v -deffnm ${istep} -cpi ${istep}.cpt -append
+    else
+        gmx grompp -f ${istep}.mdp -o ${istep}.tpr -c ${pstep}.gro -r ${rest_prefix}.gro -p ${input_dir}/topol.top -n ${input_dir}/index.ndx
+        gmx mdrun -v -deffnm ${istep}
+    endif
+    @ cnt += 1
+end
+
+# Production
+set cnt    = 1
+set cntmax = 1   # 例如你要跑 step7_1 和 step7_2
+
+while ( ${cnt} <= ${cntmax} )
+    @ pcnt = ${cnt} - 1
+    set istep = ${prod_step}_${cnt}
+    set pstep = ${prod_step}_${pcnt}
+
+    if ( -e ${istep}.gro ) then
+        echo "Skip ${istep}, already done."
+    else if ( -e ${istep}.cpt ) then
+        echo "Continue ${istep} from checkpoint."
+        gmx mdrun -v -deffnm ${istep} -cpi ${istep}.cpt -append
+    else
+        if ( ${cnt} == 1 ) then
+            set pstep = `printf ${equi_prefix} 6`
+            gmx grompp -f ${prod_prefix}.mdp -o ${istep}.tpr -c ${pstep}.gro -p ${input_dir}/topol.top -n ${input_dir}/index.ndx
+        else
+            gmx grompp -f ${prod_prefix}.mdp -o ${istep}.tpr -c ${pstep}.gro -t ${pstep}.cpt -p ${input_dir}/topol.top -n ${input_dir}/index.ndx
+        endif
+        gmx mdrun -v -deffnm ${istep}
+    endif
+    @ cnt += 1
+end

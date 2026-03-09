@@ -1,0 +1,307 @@
+import MDAnalysis as mda
+from MDAnalysis.analysis import distances
+import numpy as np
+import pandas as pd
+import glob
+import os
+import re
+
+# ==============================================================================
+# 1. 用户配置区 (USER CONFIGURATION) - 请修改这里
+# ==============================================================================
+
+# 定义你的配体残基名称 (在gro/pdb文件中)
+LIGAND_RESNAME = "LIG" 
+
+# 定义受体上关键残基的 ID (Residue ID, 数字)
+# 注意：MDAnalysis 通常从 gro/pdb 文件读取编号。请确认是 1-based index。
+# 例如：6.51 和 6.52 对应的实际残基编号 (假设是 Phe200 和 Phe201)
+KEY_RESIDUES_651_652 = [200, 201] 
+
+# 定义其他感兴趣的 OBP 口袋氨基酸 (用于计算距离特征)
+OBP_OTHER_RESIDUES = [155, 156, 180, 280, 285]
+
+# 定义受体上的“基准平面”
+# 选取 3 个或更多相对静止的 alpha 碳原子 ID (例如 TM 螺旋底部的残基) 来定义受体坐标系
+RECEPTOR_PLANE_RESIDUES = [130, 250, 300] 
+
+# 截断值定义
+DIST_CUTOFF = 4.5       # 埃 (Angstrom), 判定相互作用的距离阈值
+ANGLE_CENTER = 90.0     # 度, T-shaped 理想角度
+ANGLE_TOLERANCE = 20.0  # 度, 角度容忍范围 (+/-)
+
+# 根目录 (脚本会从这里开始搜索)
+ROOT_DIR = "." 
+
+# ==============================================================================
+# 2. CUBE 文件解析器 (无需修改)
+# ==============================================================================
+class CubeParser:
+    def __init__(self, filepath):
+        self.filepath = filepath
+        self.atoms = [] # List of (AtomicNum, x, y, z, value)
+        self.origin = None
+        self.spacing = None
+        self.dims = None
+        self.data = None
+        self._load()
+
+    def _load(self):
+        with open(self.filepath, 'r') as f:
+            lines = f.readlines()
+            # CUBE header parsing
+            natoms = int(lines[2].split()[0])
+            self.origin = np.array([float(x) for x in lines[2].split()[1:4]])
+            
+            # Grid dimensions and vectors
+            nx = int(lines[3].split()[0]); vx = np.array([float(x) for x in lines[3].split()[1:4]])
+            ny = int(lines[4].split()[0]); vy = np.array([float(x) for x in lines[4].split()[1:4]])
+            nz = int(lines[5].split()[0]); vz = np.array([float(x) for x in lines[5].split()[1:4]])
+            
+            self.dims = (nx, ny, nz)
+            # Assuming orthogonal grid for simplicity (standard Gaussian/Multiwfn output)
+            self.spacing = np.array([vx[0], vy[1], vz[2]]) 
+            
+            # Read Atoms
+            atom_lines = lines[6 : 6 + abs(natoms)]
+            self.atom_coords = []
+            self.atom_types = []
+            for line in atom_lines:
+                parts = line.split()
+                at_num = int(parts[0])
+                # CUBE coords are in Bohr usually, check Multiwfn settings. 
+                # Assuming Angstroms if generated specifically for MD mapping, 
+                # BUT standard CUBE is Bohr. Multiwfn often converts. 
+                # 这里假设 CUBE 和 MD 都在 Angstrom 或者已对齐。
+                # 如果数值非常大/小，可能需要 Bohr -> Angstrom 转换 ( * 0.529177)
+                coords = np.array([float(x) for x in parts[2:5]])
+                self.atom_types.append(at_num)
+                self.atom_coords.append(coords)
+            
+            # Read Volumetric Data (ELF)
+            # Data starts after atoms
+            data_start_line = 6 + abs(natoms)
+            raw_data = []
+            for line in lines[data_start_line:]:
+                raw_data.extend([float(x) for x in line.split()])
+            
+            self.data = np.array(raw_data).reshape(self.dims)
+
+    def get_atom_values(self, target_atomic_num=6):
+        """获取指定原子位置处的 ELF 值（最近邻插值）"""
+        results = [] # (index, value)
+        for i, (at_num, coord) in enumerate(zip(self.atom_types, self.atom_coords)):
+            if at_num == target_atomic_num:
+                # Map coord to grid index
+                grid_idx = np.round((coord - self.origin) / self.spacing).astype(int)
+                
+                # Boundary check
+                if np.all(grid_idx >= 0) and np.all(grid_idx < self.dims):
+                    val = self.data[grid_idx[0], grid_idx[1], grid_idx[2]]
+                    results.append(val)
+                else:
+                    results.append(0.0) # Atom outside grid
+        return np.array(results)
+
+# ==============================================================================
+# 3. 核心计算类
+# ==============================================================================
+def find_benzene_ring(universe, resname):
+    """尝试自动寻找配体中的6元碳环"""
+    ligand = universe.select_atoms(f"resname {resname}")
+    # 这里使用一个简单的启发式方法：找连接成环的6个碳
+    # 既然用户提到是苯环，我们假设有6个碳原子
+    carbons = ligand.select_atoms("name C*")
+    
+    # 如果原子命名规范 (C1..C6)，可以直接用名字
+    # 为了通用，这里假设前6个碳或者是连接在一起的。
+    # 这是一个简化处理，如果能手动指定原子名列表最稳妥
+    
+    # 方案 B: 返回所有配体碳原子，由后续距离筛选
+    # 方案 A (推荐): 用户手动在 Config 指定名字，或者这里返回所有碳
+    # 考虑到自动化，我们返回所有配体碳原子，但在计算 ELF 时只取前 N 个或匹配的
+    return carbons
+
+def calculate_plane_normal(atom_group):
+    """计算一组原子的拟合平面法向量"""
+    coords = atom_group.positions
+    centroid = coords.mean(axis=0)
+    coords -= centroid
+    u, s, vh = np.linalg.svd(coords)
+    normal = vh[2, :] # The last row of Vh is the normal to the best-fit plane
+    return normal
+
+def process_trajectory(xtc_file, pdb_file, cube_file, compound_id):
+    print(f"  -> Processing: {os.path.basename(xtc_file)}...")
+    
+    # 1. Load Topology and Trajectory
+    try:
+        u = mda.Universe(pdb_file, xtc_file)
+    except Exception as e:
+        print(f"Error loading MD: {e}")
+        return None
+
+    # 2. Load ELF Weights from CUBE
+    # 假设 CUBE 里的碳原子顺序与 PDB 里的配体碳原子顺序一致
+    # 这是一个强假设。如果顺序不一致，需要基于坐标对齐 (RMSD) 来匹配
+    try:
+        cp = CubeParser(cube_file)
+        elf_values = cp.get_atom_values(target_atomic_num=6) # 获取所有碳的 ELF
+        # 归一化 ELF 权重 (可选)
+        if len(elf_values) > 0:
+            elf_weights = elf_values / np.max(elf_values) 
+        else:
+            elf_weights = np.ones(6) # Fallback
+    except Exception as e:
+        print(f"Error loading CUBE: {e}, using default weights.")
+        elf_weights = np.ones(6) # 假定权重为1
+
+    # 3. Selections
+    lig_carbons = u.select_atoms(f"resname {LIGAND_RESNAME} and name C*")
+    # 截取对应 ELF 数量的碳原子 (假设 CUBE 里包含了配体所有的碳)
+    if len(lig_carbons) != len(elf_weights):
+        # 简单对齐：只取前 min 个
+        n = min(len(lig_carbons), len(elf_weights))
+        lig_carbons = lig_carbons[:n]
+        elf_weights = elf_weights[:n]
+        
+    res_651_652 = u.select_atoms(f"resid {' '.join(map(str, KEY_RESIDUES_651_652))}")
+    res_obp_others = u.select_atoms(f"resid {' '.join(map(str, OBP_OTHER_RESIDUES))} and name CA") # 简化计算，只算到 CA 距离
+    ref_plane_atoms = u.select_atoms(f"resid {' '.join(map(str, RECEPTOR_PLANE_RESIDUES))} and name CA")
+
+    # Storage
+    valid_frames_count = 0
+    total_frames = 0
+    angle_list = []
+    obp_distances_sum = np.zeros(len(OBP_OTHER_RESIDUES))
+
+    # 4. Iterate Frames
+    for ts in u.trajectory:
+        total_frames += 1
+        
+        # --- A. ELF-weighted Interaction (Occupancy) ---
+        # 计算每个碳原子到 6.51/6.52 质心的最小距离
+        # 6.51/6.52 Center of Mass
+        target_com = res_651_652.center_of_mass()
+        lig_coords = lig_carbons.positions
+        
+        dists = np.linalg.norm(lig_coords - target_com, axis=1) # 形状 (N_carbons,)
+        
+        # 角度计算: 配体平面 vs 6.51 侧链平面 (这里简化为 配体 vs Z轴 或 配体 vs 受体基准面)
+        # 严格的 T-shaped 需要计算两个苯环法向量的点积
+        # 这里使用受体基准面作为参考
+        lig_normal = calculate_plane_normal(lig_carbons)
+        rec_normal = calculate_plane_normal(ref_plane_atoms)
+        
+        # 计算夹角 (0-180)
+        dot_prod = np.dot(lig_normal, rec_normal)
+        angle = np.degrees(np.arccos(np.clip(dot_prod, -1.0, 1.0)))
+        if angle > 90: angle = 180 - angle # 只要平面间的锐角
+        
+        angle_list.append(angle)
+        
+        # Boolean Logic:
+        # 这里的逻辑是：如果 (任意强ELF碳原子的距离合格) AND (整体角度合格)
+        # 更加精细的逻辑：Score = sum( ELF_i * (1 if dist_i < cutoff else 0) )
+        # 如果 Score > 阈值，则记为 1
+        
+        current_score = 0
+        is_close = dists < DIST_CUTOFF
+        is_angle_good = (ANGLE_CENTER - ANGLE_TOLERANCE) <= angle <= (ANGLE_CENTER + ANGLE_TOLERANCE)
+        
+        if is_angle_good:
+            # 只有角度对的时候，才累加 ELF 贡献
+            current_score = np.sum(elf_weights[is_close])
+        
+        # 假设只要有一个显著的 ELF 碳原子接触，就算占据
+        if current_score > 0.1: # 阈值可调
+            valid_frames_count += 1
+
+        # --- B. Other OBP Distances (Feature Extraction) ---
+        # 计算配体中心到其他 OBP 残基 CA 的距离
+        lig_center = lig_carbons.center_of_mass()
+        obp_dists = []
+        for res in res_obp_others:
+            d = np.linalg.norm(lig_center - res.position)
+            obp_dists.append(d)
+        obp_distances_sum += np.array(obp_dists)
+
+    # 5. Summarize this trajectory
+    occupancy = (valid_frames_count / total_frames) * 100
+    angle_mean = np.mean(angle_list)
+    angle_std = np.std(angle_list)
+    obp_dist_avg = obp_distances_sum / total_frames
+    
+    return {
+        "Compound": compound_id,
+        "Replica": os.path.basename(os.path.dirname(xtc_file)), # extraction from folder name
+        "ELF_T_Occupancy": occupancy,
+        "Global_Angle_Mean": angle_mean,
+        "Global_Angle_SD": angle_std,
+        **{f"Dist_OBP_{r}": d for r, d in zip(OBP_OTHER_RESIDUES, obp_dist_avg)}
+    }
+
+# ==============================================================================
+# 4. 主程序循环
+# ==============================================================================
+def main():
+    results = []
+    
+    # 查找所有文件夹
+    # 假设结构: 20251115_D2_ARI... / charmm-gui... / gromacs_replicate_1 / step7...xtc
+    print("Searching for trajectories...")
+    
+    # 获取第一层文件夹 (Compounds)
+    compound_dirs = glob.glob(os.path.join(ROOT_DIR, "2025*")) 
+    
+    for c_dir in compound_dirs:
+        compound_id = os.path.basename(c_dir)
+        print(f"Analyzing Compound: {compound_id}")
+        
+        # 寻找该化合物对应的 CUBE 文件
+        # 假设 CUBE 文件在化合物目录下，或者名字里包含 ID
+        # 你需要根据实际情况修改这里的查找逻辑
+        cube_files = glob.glob(os.path.join(c_dir, "*.cub"))
+        if not cube_files:
+            print(f"Warning: No CUBE file found for {compound_id}, skipping ELF loading.")
+            cube_file = None
+        else:
+            cube_file = cube_files[0] # 取第一个
+
+        # 寻找对应的 PDB/GRO (用于拓扑)
+        # 通常在 charmm-gui 文件夹里有 step7_production.gro 或 similar
+        # 这里为了稳妥，我们递归搜索 .pdb 或 .gro
+        topo_files = []
+        for root, dirs, files in os.walk(c_dir):
+            for f in files:
+                if f.endswith(".gro") or f.endswith(".pdb"):
+                    topo_files.append(os.path.join(root, f))
+        
+        if not topo_files:
+            print("No topology file found, skipping.")
+            continue
+        topo_file = topo_files[0] # 选一个作为拓扑
+
+        # 寻找所有 Replicate 的 XTC
+        xtc_pattern = os.path.join(c_dir, "**", "step7_*.xtc")
+        xtc_files = glob.glob(xtc_pattern, recursive=True)
+        
+        for xtc in xtc_files:
+            # 运行分析
+            data = process_trajectory(xtc, topo_file, cube_file, compound_id)
+            if data:
+                results.append(data)
+
+    # 保存结果
+    df = pd.DataFrame(results)
+    
+    # 按照化合物取平均 (Aggregation over replicas)
+    # 这一步将 3次重复 合并为 1行数据
+    final_df = df.groupby("Compound").mean(numeric_only=True).reset_index()
+    
+    output_file = "agonist_features.csv"
+    final_df.to_csv(output_file, index=False)
+    print(f"Done! Features saved to {output_file}")
+
+if __name__ == "__main__":
+    main()
